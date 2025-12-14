@@ -4,7 +4,7 @@ import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { appendFileSync, existsSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,6 +110,14 @@ JSON形式で以下のように回答してください:
             const absoluteLogPath = logPath.startsWith('.')
                 ? join(__dirname, '..', '..', logPath)
                 : logPath;
+
+            // ログディレクトリを作成（存在しない場合）
+            const logDir = dirname(absoluteLogPath);
+            if (!existsSync(logDir)) {
+
+                mkdirSync(logDir, { recursive: true });
+                logger.info(`ログディレクトリを作成しました: ${logDir}`);
+            }
 
             // ファイルが存在しない場合はヘッダーを作成
             if (!existsSync(absoluteLogPath)) {

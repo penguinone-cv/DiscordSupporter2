@@ -11,7 +11,7 @@
         "recruitmentDetection": {
             "enabled": true,
             "csvPath": "./recruitment_data.csv",
-            "logPath": "./recruitment_log.csv"
+            "logPath": "./data/recruitment_log.csv"
         },
         "autoRole": {
             "enabled": true,

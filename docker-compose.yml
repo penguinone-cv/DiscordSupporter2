@@ -6,14 +6,12 @@ services:
     container_name: discord-supporter-bot
     restart: unless-stopped
     volumes:
-      # 設定ファイルをマウント
+      # 設定ファイルをマウント（読み取り専用）
       - ./config.json:/app/config.json:ro
       # CSVデータをマウント
       - ./recruitment_data.csv:/app/recruitment_data.csv
-      # ログファイルをマウント
-      - ./recruitment_log.csv:/app/recruitment_log.csv
-      # リマインダーデータをマウント
-      - ./reminders.json:/app/reminders.json
+      # ログとリマインダーはディレクトリごとマウント（ファイル自動作成を許可）
+      - ./data:/app/data
     ports:
       # WebUIポート
       - "3000:3000"

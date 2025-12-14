@@ -4,11 +4,8 @@ node_modules/
 # Configuration files with sensitive data
 config.json
 
-# Detection logs
-recruitment_log.csv
-
-# Reminder data
-reminders.json
+# Data directory (logs, reminders)
+data/
 
 # Logs
 logs/

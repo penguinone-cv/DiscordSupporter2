@@ -14,13 +14,21 @@ class ReminderService {
     constructor() {
         this.reminders = new Map(); // reminderId -> reminderData
         this.timers = new Map(); // reminderId -> timeout
-        this.remindersFilePath = join(__dirname, '..', '..', 'reminders.json');
+        this.remindersFilePath = join(__dirname, '..', '..', 'data', 'reminders.json');
     }
 
     /**
      * サービスを初期化
      */
-    initialize() {
+    async initialize() {
+        // dataディレクトリを作成（存在しない場合）
+        const dataDir = dirname(this.remindersFilePath);
+        if (!existsSync(dataDir)) {
+            const { mkdirSync } = await import('fs');
+            mkdirSync(dataDir, { recursive: true });
+            logger.info(`dataディレクトリを作成しました: ${dataDir}`);
+        }
+
         // 保存されているリマインドを読み込む
         this.loadReminders();
         logger.info('リマインドサービスを初期化しました');
