@@ -22,6 +22,23 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
   - `allow_multi_select`: 複数選択を許可するか（デフォルトtrue）
   - `candidate`: 候補（スペース区切りで複数指定、必須）
 
+### 4. WebUI管理画面
+- **CSV編集機能**: ブラウザから `recruitment_data.csv` を編集可能
+- **データ統計表示**: 総データ数、募集/非募集メッセージの内訳を表示
+- **リアルタイム編集**: データの追加、編集、削除、保存がブラウザ上で完結
+- **アクセス**: `http://localhost:3000` （デフォルト）
+- **ログ閲覧**: 募集メッセージ検出ログをタブで表示
+
+### 5. チャンネル作成時の自動メッセージ
+- **初期メッセージ投稿**: 新しいチャンネルが作成されると、自動的に「ここは<チャンネル名>の遊び場」というメッセージを投稿
+- **テキストチャンネルのみ対応**: ボイスチャンネルなどは除外
+
+### 6. リマインド機能
+- **返信でリマインド設定**: メッセージに返信で「リマインド」と入力すると、OpenAI APIでメッセージから日付を抽出
+- **自動日時特定**: 「明日」「来週月曜日」「12/25」などの表現を認識して絶対日時に変換
+- **12:00に通知**: 特定された日の12:00（正午）にメンションでリマインド
+- **データ永続化**: `reminders.json` に保存され、Bot再起動後も有効
+
 ## セットアップ
 
 ### 必要要件
@@ -66,6 +83,10 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
          "enabled": true,
          "response": "はーい"
        }
+     },
+     "webui": {
+       "enabled": true,
+       "port": 3000
      }
    }
    ```
@@ -80,6 +101,25 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
    ```
 
    サンプルファイルが既に含まれているので、そのまま使用または編集できます。
+
+### WebUI管理画面の使用
+
+1. **Botを起動**
+   ```bash
+   npm start
+   ```
+
+2. **ブラウザでアクセス**
+   ```
+   http://localhost:3000
+   ```
+
+3. **データを編集**
+   - ➕ **新規追加**: 新しい学習データを追加
+   - 📝 **編集**: 既存データを直接編集
+   - 🗑️ **削除**: 不要なデータを削除
+   - 💾 **保存**: 変更をCSVファイルに保存
+   - 🔄 **再読み込み**: ファイルから最新データを読み込み
 
 ### Discord Bot の設定
 
@@ -117,7 +157,10 @@ DiscordSupporter_AI/
 ├── config.example.json             # 設定ファイルのテンプレート
 ├── config.json                     # 実際の設定ファイル（Git管理外）
 ├── recruitment_data.csv            # RAG用の募集メッセージサンプル
+├── recruitment_log.csv             # 募集検出ログ（Git管理外）
 ├── README.md
+├── public/                         # WebUI静的ファイル
+│   └── index.html                  # CSV編集UI
 └── src/
     ├── index.js                    # エントリーポイント
     ├── bot.js                      # Bot初期化・起動
@@ -132,7 +175,8 @@ DiscordSupporter_AI/
     ├── services/
     │   ├── openaiService.js        # OpenAI API統合
     │   ├── recruitmentDetector.js  # 募集メッセージ検出
-    │   └── roleManager.js          # ロール管理
+    │   ├── roleManager.js          # ロール管理
+    │   └── webServer.js            # WebUIサーバー
     └── utils/
         ├── csvLoader.js            # CSVデータ読み込み
         └── logger.js               # ロギング

@@ -12,6 +12,10 @@ const voteCommand = {
             option.setName('title')
                 .setDescription('投票のタイトル')
                 .setRequired(true))
+        .addStringOption(option =>
+            option.setName('candidate')
+                .setDescription('候補（スペース区切りで複数指定）')
+                .setRequired(true))
         .addIntegerOption(option =>
             option.setName('vote_period')
                 .setDescription('投票受付期間（時間単位）')
@@ -21,11 +25,7 @@ const voteCommand = {
         .addBooleanOption(option =>
             option.setName('allow_multi_select')
                 .setDescription('複数選択を許可するか')
-                .setRequired(false))
-        .addStringOption(option =>
-            option.setName('candidate')
-                .setDescription('候補（スペース区切りで複数指定）')
-                .setRequired(true)),
+                .setRequired(false)),
 
     /**
      * コマンド実行

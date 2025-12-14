@@ -3,9 +3,12 @@ import config from './config/configLoader.js';
 import openaiService from './services/openaiService.js';
 import recruitmentDetector from './services/recruitmentDetector.js';
 import roleManager from './services/roleManager.js';
+import reminderService from './services/reminderService.js';
+import webServer from './services/webServer.js';
 import handleMessage from './handlers/messageHandler.js';
 import handleReactionAdd from './handlers/reactionHandler.js';
 import handleInteraction from './handlers/interactionHandler.js';
+import handleChannelCreate from './handlers/channelCreateHandler.js';
 import voteCommand from './commands/vote.js';
 import logger from './utils/logger.js';
 
@@ -44,6 +47,15 @@ class Bot {
         openaiService.initialize();
         recruitmentDetector.initialize();
         roleManager.initialize();
+        reminderService.initialize();
+
+        // グローバルクライアント参照を設定（リマインド実行用）
+        global.discordClient = this.client;
+
+        // WebUIサーバーを初期化（有効な場合のみ）
+        if (config.get('webui.enabled')) {
+            webServer.initialize();
+        }
 
         // イベントハンドラーを登録
         this.registerEventHandlers();
@@ -69,6 +81,9 @@ class Bot {
 
         // リアクション追加
         this.client.on('messageReactionAdd', handleReactionAdd);
+
+        // チャンネル作成
+        this.client.on('channelCreate', handleChannelCreate);
 
         // インタラクション（スラッシュコマンド、ボタンなど）
         this.client.on('interactionCreate', async (interaction) => {
@@ -116,11 +131,16 @@ class Bot {
     }
 
     /**
-     * Botを起動
-     */
+   * Botを起動
+   */
     async start() {
         const token = config.get('discord.token');
         await this.client.login(token);
+
+        // WebUIサーバーを起動（有効な場合のみ）
+        if (config.get('webui.enabled')) {
+            webServer.start();
+        }
     }
 }
 

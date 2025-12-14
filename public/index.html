@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Supporter - 管理画面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #5865F2;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            color: #5865F2;
+        }
+
+        .tab.active {
+            color: #5865F2;
+            border-bottom-color: #5865F2;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #5865F2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3);
+        }
+
+        button:hover {
+            background: #4752C4;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #57F287;
+            box-shadow: 0 4px 12px rgba(87, 242, 135, 0.3);
+        }
+
+        button.secondary:hover {
+            background: #3BA55D;
+        }
+
+        button.danger {
+            background: #ED4245;
+            box-shadow: 0 4px 12px rgba(237, 66, 69, 0.3);
+        }
+
+        button.danger:hover {
+            background: #C03537;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #5865F2, #7289DA);
+            color: white;
+        }
+
+        th {
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f8f9ff;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #5865F2;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 6px;
+        }
+
+        .status {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .status.success {
+            background: #D4EDDA;
+            color: #155724;
+            border-left: 4px solid #28A745;
+        }
+
+        .status.error {
+            background: #F8D7DA;
+            color: #721C24;
+            border-left: 4px solid #DC3545;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #5865F2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.recruitment {
+            background: #D4EDDA;
+            color: #155724;
+        }
+
+        .badge.non-recruitment {
+            background: #F8D7DA;
+            color: #721C24;
+        }
+
+        .log-time {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🤖 Discord Supporter</h1>
+        <p class="subtitle">募集メッセージ学習データ & ログ管理</p>
+
+        <div id="status"></div>
+
+        <!-- タブ -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('data')">📝 データ編集</button>
+            <button class="tab" onclick="switchTab('logs')">📊 検出ログ</button>
+        </div>
+
+        <!-- データ編集タブ -->
+        <div id="data-tab" class="tab-content active">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">総データ数</div>
+                    <div class="stat-value" id="totalCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">募集メッセージ</div>
+                    <div class="stat-value" id="recruitmentCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">非募集メッセージ</div>
+                    <div class="stat-value" id="nonRecruitmentCount">0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button onclick="addRow()" class="secondary">➕ 新規追加</button>
+                <button onclick="saveData()">💾 保存</button>
+                <button onclick="loadData()">🔄 再読み込み</button>
+            </div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                読み込み中...
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 35%">メッセージ</th>
+                            <th style="width: 15%">募集メッセージ</th>
+                            <th style="width: 40%">理由</th>
+                            <th style="width: 10%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ログ閲覧タブ -->
+        <div id="logs-tab" class="tab-content">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">総ログ数</div>
+                    <div class="stat-value" id="logCount">0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button onclick="loadLogs()">🔄 再読み込み</button>
+            </div>
+
+            <div id="loadingLogs" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                読み込み中...
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%">日時</th>
+                            <th style="width: 10%">チャンネル</th>
+                            <th style="width: 30%">メッセージ</th>
+                            <th style="width: 10%">判定</th>
+                            <th style="width: 35%">理由</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = [];
+        let logs = [];
+        let currentTab = 'data';
+
+        // ページ読み込み時にデータを取得
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+        });
+
+        // タブ切り替え
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // タブボタンのアクティブ状態を更新
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // タブコンテンツの表示切り替え
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tab}-tab`).classList.add('active');
+
+            // ログタブに切り替えたらログを読み込む
+            if (tab === 'logs' && logs.length === 0) {
+                loadLogs();
+            }
+        }
+
+        // データを読み込む
+        async function loadData() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/csv');
+                const result = await response.json();
+
+                if (result.success) {
+                    data = result.data;
+                    renderTable();
+                    updateStats();
+                    showStatus('データを読み込みました', 'success');
+                } else {
+                    showStatus('エラー: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('データの読み込みに失敗しました', 'error');
+                console.error(error);
+            }
+            showLoading(false);
+        }
+
+        // ログを読み込む
+        async function loadLogs() {
+            showLoadingLogs(true);
+            try {
+                const response = await fetch('/api/logs');
+                const result = await response.json();
+
+                if (result.success) {
+                    logs = result.data;
+                    renderLogsTable();
+                    updateLogStats();
+                    showStatus('ログを読み込みました', 'success');
+                } else {
+                    showStatus('エラー: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('ログの読み込みに失敗しました', 'error');
+                console.error(error);
+            }
+            showLoadingLogs(false);
+        }
+
+        // データを保存する
+        async function saveData() {
+            const tableData = getTableData();
+
+            try {
+                const response = await fetch('/api/csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ data: tableData })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    data = tableData;
+                    updateStats();
+                    showStatus('保存しました！', 'success');
+                } else {
+                    showStatus('エラー: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('保存に失敗しました', 'error');
+                console.error(error);
+            }
+        }
+
+        // データテーブルをレンダリング
+        function renderTable() {
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = '';
+
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><textarea id="message-${index}">${escapeHtml(row.message || '')}</textarea></td>
+                    <td>
+                        <select id="recruitment-${index}">
+                            <option value="true" ${row.is_recruitment === 'true' ? 'selected' : ''}>はい</option>
+                            <option value="false" ${row.is_recruitment === 'false' ? 'selected' : ''}>いいえ</option>
+                        </select>
+                    </td>
+                    <td><textarea id="reason-${index}">${escapeHtml(row.reason || '')}</textarea></td>
+                    <td class="actions">
+                        <button class="btn-small danger" onclick="deleteRow(${index})">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ログテーブルをレンダリング
+        function renderLogsTable() {
+            const tbody = document.getElementById('logsTable');
+            tbody.innerHTML = '';
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #666;">ログがありません</td></tr>';
+                return;
+            }
+
+            logs.forEach(log => {
+                const tr = document.createElement('tr');
+                const date = new Date(log.timestamp);
+                const dateStr = date.toLocaleString('ja-JP');
+                const isRecruitment = log.is_recruitment === 'true' || log.is_recruitment === true;
+
+                tr.innerHTML = `
+                    <td class="log-time">${dateStr}</td>
+                    <td>${escapeHtml(log.channel || '')}</td>
+                    <td>${escapeHtml(log.message || '')}</td>
+                    <td><span class="badge ${isRecruitment ? 'recruitment' : 'non-recruitment'}">${isRecruitment ? '募集' : '非募集'}</span></td>
+                    <td>${escapeHtml(log.reason || '')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 新しい行を追加
+        function addRow() {
+            data.push({
+                message: '',
+                is_recruitment: 'false',
+                reason: ''
+            });
+            renderTable();
+            updateStats();
+        }
+
+        // 行を削除
+        function deleteRow(index) {
+            if (confirm('この行を削除しますか？')) {
+                data.splice(index, 1);
+                renderTable();
+                updateStats();
+            }
+        }
+
+        // テーブルからデータを取得
+        function getTableData() {
+            const tableData = [];
+            data.forEach((_, index) => {
+                const message = document.getElementById(`message-${index}`).value;
+                const is_recruitment = document.getElementById(`recruitment-${index}`).value;
+                const reason = document.getElementById(`reason-${index}`).value;
+
+                tableData.push({
+                    message,
+                    is_recruitment,
+                    reason
+                });
+            });
+            return tableData;
+        }
+
+        // 統計を更新
+        function updateStats() {
+            const total = data.length;
+            const recruitment = data.filter(r => r.is_recruitment === 'true').length;
+            const nonRecruitment = total - recruitment;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('recruitmentCount').textContent = recruitment;
+            document.getElementById('nonRecruitmentCount').textContent = nonRecruitment;
+        }
+
+        // ログ統計を更新
+        function updateLogStats() {
+            document.getElementById('logCount').textContent = logs.length;
+        }
+
+        // ステータスメッセージを表示
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // ローディング表示
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // ログローディング表示
+        function showLoadingLogs(show) {
+            document.getElementById('loadingLogs').style.display = show ? 'block' : 'none';
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>

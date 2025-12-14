@@ -7,6 +7,9 @@ config.json
 # Detection logs
 recruitment_log.csv
 
+# Reminder data
+reminders.json
+
 # Logs
 logs/
 *.log
