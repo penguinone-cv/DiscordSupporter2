@@ -169,9 +169,10 @@ class WebServer {
      */
     start() {
         const port = config.get('webui.port') || this.port;
+        const host = config.get('webui.host') || '0.0.0.0';
 
-        this.server = this.app.listen(port, () => {
-            logger.info(`🌐 WebUIサーバーが起動しました: http://localhost:${port}`);
+        this.server = this.app.listen(port, host, () => {
+            logger.info(`🌐 WebUIサーバーが起動しました: http://${host}:${port}`);
         });
     }
 
