@@ -226,6 +226,85 @@ DiscordSupporter_AI/
    sudo journalctl -u discord-bot -f
    ```
 
+## Docker での運用 🐳
+
+### メリット
+- ✅ プロセス管理が簡単（ゾンビプロセスの心配なし）
+- ✅ 環境の一貫性（どこでも同じように動作）
+- ✅ 簡単な起動・停止・再起動
+- ✅ ログ管理が統一的
+
+### 前提条件
+- Docker Desktop (Windows) または Docker Engine (Ubuntu)
+- Docker Compose
+
+### セットアップ
+
+1. **設定ファイルを準備**
+   ```bash
+   cp config.example.json config.json
+   # config.jsonを編集
+   ```
+
+2. **Dockerイメージをビルド**
+   ```bash
+   docker-compose build
+   ```
+
+3. **起動**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **ログ確認**
+   ```bash
+   docker-compose logs -f
+   ```
+
+5. **停止**
+   ```bash
+   docker-compose down
+   ```
+
+6. **再起動**
+   ```bash
+   docker-compose restart
+   ```
+
+### 便利なコマンド
+
+```bash
+# ステータス確認
+docker-compose ps
+
+# コンテナに入る
+docker-compose exec discord-bot sh
+
+# ログ確認（最新100行）
+docker-compose logs --tail=100
+
+# リアルタイムログ
+docker-compose logs -f
+
+# コンテナ削除して再ビルド
+docker-compose down
+docker-compose up -d --build
+```
+
+### データの永続化
+
+以下のファイルはホストマシンとコンテナ間で共有されます：
+- `config.json` - 設定ファイル（読み取り専用）
+- `recruitment_data.csv` - 学習データ
+- `recruitment_log.csv` - 検出ログ
+- `reminders.json` - リマインダーデータ
+
+### WebUIへのアクセス
+
+```
+http://localhost:3000
+```
+
 ## カスタマイズ
 
 ### ゲームチャンネルカテゴリ名の変更

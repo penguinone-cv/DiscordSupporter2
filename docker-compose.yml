@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: discord-supporter-bot
+    restart: unless-stopped
+    volumes:
+      # 設定ファイルをマウント
+      - ./config.json:/app/config.json:ro
+      # CSVデータをマウント
+      - ./recruitment_data.csv:/app/recruitment_data.csv
+      # ログファイルをマウント
+      - ./recruitment_log.csv:/app/recruitment_log.csv
+      # リマインダーデータをマウント
+      - ./reminders.json:/app/reminders.json
+    ports:
+      # WebUIポート
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Tokyo
+    # ヘルスチェック
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
