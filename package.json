@@ -1,0 +1,24 @@
+{
+  "name": "discord-supporter-ai",
+  "version": "1.0.0",
+  "description": "Discord Bot with automatic role assignment, recruitment message detection, and voting features",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "openai",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "openai": "^4.24.1",
+    "csv-parse": "^5.5.3"
+  }
+}

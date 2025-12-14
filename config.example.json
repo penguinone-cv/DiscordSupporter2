@@ -1,0 +1,25 @@
+{
+    "discord": {
+        "token": "YOUR_DISCORD_BOT_TOKEN_HERE",
+        "clientId": "YOUR_CLIENT_ID_HERE"
+    },
+    "openai": {
+        "apiKey": "YOUR_OPENAI_API_KEY_HERE",
+        "model": "gpt-4o-mini"
+    },
+    "features": {
+        "recruitmentDetection": {
+            "enabled": true,
+            "csvPath": "./recruitment_data.csv",
+            "logPath": "./recruitment_log.csv"
+        },
+        "autoRole": {
+            "enabled": true,
+            "gameCategoryName": "ゲームチャンネル"
+        },
+        "mention": {
+            "enabled": true,
+            "response": "はーい"
+        }
+    }
+}
