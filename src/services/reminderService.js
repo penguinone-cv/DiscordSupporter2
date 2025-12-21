@@ -38,26 +38,27 @@ class ReminderService {
      * メッセージから日付を抽出
      * @param {string} messageContent - メッセージ内容
      * @param {Date} messageTimestamp - メッセージの送信日時
-     * @returns {Promise<Date|null>} 抽出された日時
+     * @returns {Promise<Date|null>} 抽出された日時（常に12:00に固定）
      */
     async extractDate(messageContent, messageTimestamp) {
         try {
             const currentTime = messageTimestamp.toISOString();
 
-            const systemPrompt = `あなたは日付抽出の専門家です。メッセージから日付を抽出してください。
+            const systemPrompt = `あなたは日付抽出の専門家です。メッセージから日付（年月日）のみを抽出してください。
 
 現在の日時: ${currentTime}
 
 ルール:
 - メッセージに含まれる日付表現（「明日」「来週月曜日」「12/25」など）を認識
-- メッセージ送信日時を基準に絶対的な日時を計算
-- 時刻の指定がない場合は12:00（正午）とする
+- メッセージ送信日時を基準に絶対的な日付を計算
+- 【重要】時刻は無視して、日付（年月日）のみを抽出する
+- メッセージ内に時刻（22時、午後3時など）が含まれていても無視する
 - 日付が特定できない場合はnullを返す
 
 JSON形式で以下のように回答してください:
 {
   "hasDate": true/false,
-  "datetime": "YYYY-MM-DDTHH:mm:ss" または null,
+  "date": "YYYY-MM-DD" または null,
   "reason": "判定理由"
 }`;
 
@@ -68,9 +69,11 @@ JSON形式で以下のように回答してください:
 
             const result = await openaiService.chatJSON(messages);
 
-            if (result.hasDate && result.datetime) {
-                const date = new Date(result.datetime);
-                logger.info(`日付抽出成功: ${messageContent} -> ${date.toISOString()}`);
+            if (result.hasDate && result.date) {
+                // 日付のみを取得し、時刻は常に12:00に固定
+                const [year, month, day] = result.date.split('-').map(Number);
+                const date = new Date(year, month - 1, day, 12, 0, 0);
+                logger.info(`日付抽出成功: ${messageContent} -> ${date.toISOString()} (12:00固定)`);
                 return date;
             }
 
