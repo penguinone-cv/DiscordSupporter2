@@ -169,10 +169,23 @@ JSON形式で以下のように回答してください:
                 return;
             }
 
-            // リマインドメッセージを送信
+            // チャンネル名と同じロールを検索
+            const roleName = channel.name;
+            const role = channel.guild?.roles.cache.find(r => r.name === roleName);
+
+            // リマインドメッセージを送信（ロールメンション）
+            let mentionText;
+            if (role) {
+                mentionText = `<@&${role.id}>`;
+            } else {
+                // ロールが見つからない場合はチャンネル名を表示
+                mentionText = `@${roleName}`;
+                logger.warn(`ロールが見つかりません: ${roleName}`);
+            }
+
             await message.reply({
-                content: `<@${reminder.userId}> リマインド: ${reminder.originalContent}`,
-                allowedMentions: { users: [reminder.userId] }
+                content: `${mentionText} リマインド: ${reminder.originalContent}`,
+                allowedMentions: { roles: role ? [role.id] : [] }
             });
 
             // リマインドを削除
