@@ -74,7 +74,7 @@ class WebServer {
         });
 
         // CSV保存API
-        this.app.post('/api/csv', (req, res) => {
+        this.app.post('/api/csv', async (req, res) => {
             try {
                 const { data } = req.body;
 
@@ -99,9 +99,14 @@ class WebServer {
                 writeFileSync(absolutePath, csvContent, 'utf-8');
                 logger.info('CSVファイルを更新しました');
 
+                // RAGデータを再読み込み（Bot再起動なしで反映）
+                const recruitmentDetector = (await import('./recruitmentDetector.js')).default;
+                recruitmentDetector.reload();
+                logger.info('RAGデータを再読み込みしました');
+
                 res.json({
                     success: true,
-                    message: 'CSVファイルを保存しました'
+                    message: 'CSVファイルを保存し、RAGデータを更新しました'
                 });
             } catch (error) {
                 logger.error('CSV保存エラー:', error);

@@ -22,6 +22,13 @@ class RecruitmentDetector {
      * CSVデータを読み込む
      */
     initialize() {
+        this.reload();
+    }
+
+    /**
+     * CSVデータを再読み込み（WebUIからの更新時に使用）
+     */
+    reload() {
         const csvPath = config.get('features.recruitmentDetection.csvPath');
         if (!csvPath) {
             logger.warn('CSVパスが設定されていません');
@@ -36,7 +43,9 @@ class RecruitmentDetector {
         this.trainingData = csvLoader.load(absolutePath);
         this.contextString = csvLoader.formatRecruitmentContext(this.trainingData);
 
-        logger.info('募集メッセージ検出器を初期化しました');
+        // デバッグ: コンテキスト文字列をログ出力
+        logger.debug(`RAGコンテキスト:\n${this.contextString}`);
+        logger.info(`募集メッセージ検出器を初期化しました (学習データ: ${this.trainingData.length}件)`);
     }
 
     /**
@@ -47,16 +56,22 @@ class RecruitmentDetector {
      */
     async detect(message, channel) {
         try {
+            // コンテキストが空の場合は警告
+            if (!this.contextString || this.contextString.trim() === '') {
+                logger.warn('RAGコンテキストが空です。CSVデータが正しく読み込まれていない可能性があります。');
+            }
+
             const systemPrompt = `あなたは、Discordのメッセージがゲームやイベントの参加者募集を目的としたメッセージかどうかを判定するAIアシスタントです。
 
 ${this.contextString}
 
-上記の例を参考にして、与えられたメッセージが募集メッセージかどうかを判定してください。
-
-判定基準:
-- ゲームやイベントへの参加を呼びかけている
-- 一緒に何かをする人を探している
-- 時間や条件を指定して参加者を募っている
+【重要な判定ルール】
+1. 上記の「募集メッセージの例」に含まれるメッセージと同じ、または類似したメッセージは必ず「募集メッセージ」と判定してください
+2. 上記の「募集メッセージではない例」に含まれるメッセージと同じ、または類似したメッセージは「募集メッセージではない」と判定してください
+3. 例にない新しいメッセージの場合は、以下の判定基準で判断してください:
+   - ゲームやイベントへの参加を呼びかけている
+   - 一緒に何かをする人を探している
+   - 時間や条件を指定して参加者を募っている
 
 JSON形式で以下のように回答してください:
 {
@@ -69,9 +84,12 @@ JSON形式で以下のように回答してください:
                 { role: 'user', content: `以下のメッセージを判定してください:\n\n"${message}"` }
             ];
 
+            // デバッグ: 送信するプロンプトをログ出力
+            logger.debug(`OpenAIに送信するメッセージ: "${message}"`);
+
             const result = await openaiService.chatJSON(messages);
 
-            logger.info(`募集判定: "${message}" -> ${result.isRecruitment ? '募集' : '非募集'}`);
+            logger.info(`募集判定: "${message}" -> ${result.isRecruitment ? '募集' : '非募集'} (理由: ${result.reason})`);
 
             // CSVに結果を記録
             if (result.isRecruitment) {
