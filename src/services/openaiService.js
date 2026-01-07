@@ -16,7 +16,7 @@ class OpenAIService {
      */
     initialize() {
         const apiKey = config.get('openai.apiKey');
-        this.model = config.get('openai.model') || 'gpt-4o-mini';
+        this.model = config.get('openai.model') || 'gpt-5-nano';
 
         this.client = new OpenAI({
             apiKey: apiKey
