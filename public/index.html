@@ -301,6 +301,170 @@
             font-size: 12px;
             color: #666;
         }
+
+        /* モバイルレスポンシブ対応 */
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px 15px;
+                border-radius: 12px;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+
+            .subtitle {
+                font-size: 0.95em;
+                margin-bottom: 20px;
+            }
+
+            /* タブ */
+            .tabs {
+                gap: 5px;
+            }
+
+            .tab {
+                padding: 10px 12px;
+                font-size: 14px;
+                flex: 1;
+                text-align: center;
+            }
+
+            /* 統計カード */
+            .stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .stat-card {
+                padding: 15px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+
+            .stat-label {
+                font-size: 12px;
+            }
+
+            /* ボタン */
+            .controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            button {
+                width: 100%;
+                padding: 14px 20px;
+                font-size: 15px;
+            }
+
+            button:hover {
+                transform: none;
+            }
+
+            /* テーブルをカード形式に変換 */
+            .table-container {
+                border-radius: 8px;
+            }
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead {
+                display: none;
+            }
+
+            tr {
+                margin-bottom: 15px;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+                padding: 12px;
+                background: #fafafa;
+            }
+
+            tr:hover {
+                background: #f0f4ff;
+            }
+
+            td {
+                padding: 8px 0;
+                border-bottom: none;
+                position: relative;
+                padding-left: 0;
+            }
+
+            td:before {
+                content: attr(data-label);
+                display: block;
+                font-weight: 600;
+                font-size: 11px;
+                color: #5865F2;
+                text-transform: uppercase;
+                margin-bottom: 4px;
+            }
+
+            textarea {
+                min-height: 80px;
+            }
+
+            .actions {
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+
+            .btn-small {
+                padding: 10px 16px;
+            }
+
+            /* バッジ */
+            .badge {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+
+            .log-time {
+                font-size: 11px;
+            }
+
+            /* ステータス */
+            .status {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+        }
+
+        /* さらに小さい画面向け */
+        @media screen and (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                padding: 15px 10px;
+                border-radius: 8px;
+            }
+
+            h1 {
+                font-size: 1.4em;
+            }
+
+            .tab {
+                padding: 8px 8px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 
@@ -505,15 +669,15 @@
             data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><textarea id="message-${index}">${escapeHtml(row.message || '')}</textarea></td>
-                    <td>
+                    <td data-label="メッセージ"><textarea id="message-${index}">${escapeHtml(row.message || '')}</textarea></td>
+                    <td data-label="募集メッセージ">
                         <select id="recruitment-${index}">
                             <option value="true" ${row.is_recruitment === 'true' ? 'selected' : ''}>はい</option>
                             <option value="false" ${row.is_recruitment === 'false' ? 'selected' : ''}>いいえ</option>
                         </select>
                     </td>
-                    <td><textarea id="reason-${index}">${escapeHtml(row.reason || '')}</textarea></td>
-                    <td class="actions">
+                    <td data-label="理由"><textarea id="reason-${index}">${escapeHtml(row.reason || '')}</textarea></td>
+                    <td data-label="操作" class="actions">
                         <button class="btn-small danger" onclick="deleteRow(${index})">🗑️</button>
                     </td>
                 `;
@@ -538,11 +702,11 @@
                 const isRecruitment = log.is_recruitment === 'true' || log.is_recruitment === true;
 
                 tr.innerHTML = `
-                    <td class="log-time">${dateStr}</td>
-                    <td>${escapeHtml(log.channel || '')}</td>
-                    <td>${escapeHtml(log.message || '')}</td>
-                    <td><span class="badge ${isRecruitment ? 'recruitment' : 'non-recruitment'}">${isRecruitment ? '募集' : '非募集'}</span></td>
-                    <td>${escapeHtml(log.reason || '')}</td>
+                    <td data-label="日時" class="log-time">${dateStr}</td>
+                    <td data-label="チャンネル">${escapeHtml(log.channel || '')}</td>
+                    <td data-label="メッセージ">${escapeHtml(log.message || '')}</td>
+                    <td data-label="判定"><span class="badge ${isRecruitment ? 'recruitment' : 'non-recruitment'}">${isRecruitment ? '募集' : '非募集'}</span></td>
+                    <td data-label="理由">${escapeHtml(log.reason || '')}</td>
                 `;
                 tbody.appendChild(tr);
             });

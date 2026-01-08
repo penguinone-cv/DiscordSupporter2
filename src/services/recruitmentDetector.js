@@ -91,10 +91,8 @@ JSON形式で以下のように回答してください:
 
             logger.info(`募集判定: "${message}" -> ${result.isRecruitment ? '募集' : '非募集'} (理由: ${result.reason})`);
 
-            // CSVに結果を記録
-            if (result.isRecruitment) {
-                this.appendToLog(message, true, result.reason, channel?.name || 'unknown');
-            }
+            // CSVに結果を記録（募集・非募集両方をログ）
+            this.appendToLog(message, result.isRecruitment, result.reason, channel?.name || 'unknown');
 
             return {
                 isRecruitment: result.isRecruitment,
