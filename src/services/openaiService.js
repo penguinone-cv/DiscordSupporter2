@@ -36,7 +36,6 @@ class OpenAIService {
             const response = await this.client.chat.completions.create({
                 model: this.model,
                 messages: messages,
-                temperature: options.temperature || 0.3,
                 max_tokens: options.maxTokens || 500,
                 ...options
             });
@@ -58,7 +57,6 @@ class OpenAIService {
             const response = await this.client.chat.completions.create({
                 model: this.model,
                 messages: messages,
-                temperature: 0.3,
                 response_format: { type: "json_object" }
             });
 
