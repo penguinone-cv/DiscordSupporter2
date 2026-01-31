@@ -68,7 +68,7 @@ export default async function handleMessage(message) {
         if (message.reference) {
             // 返信メッセージの場合
             const content = message.content.trim();
-            if (content === 'リマインド') {
+            if (content === 'リマインド' || content.toLowerCase() === 'remind') {
                 try {
                     // 返信元のメッセージを取得
                     const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
