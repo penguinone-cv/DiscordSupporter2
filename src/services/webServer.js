@@ -46,6 +46,11 @@ class WebServer {
             res.sendFile(join(__dirname, '..', '..', 'public', 'index.html'));
         });
 
+        // カレンダーページ
+        this.app.get('/calendar', (req, res) => {
+            res.sendFile(join(__dirname, '..', '..', 'public', 'calendar.html'));
+        });
+
         // CSV取得API
         this.app.get('/api/csv', (req, res) => {
             try {
