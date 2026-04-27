@@ -358,7 +358,7 @@
         async function loadReminders() {
             showLoading(true);
             try {
-                const res = await fetch('/api/reminders');
+                const res = await fetch('api/reminders');
                 const result = await res.json();
                 if (result.success) {
                     reminders = result.data;
@@ -380,7 +380,7 @@
 
         async function loadRelatedMembers(channelName) {
             try {
-                const res = await fetch(`/api/reminders/related?channelName=${encodeURIComponent(channelName)}`);
+                const res = await fetch(`api/reminders/related?channelName=${encodeURIComponent(channelName)}`);
                 const result = await res.json();
                 if (result.success) {
                     relatedMembers = result.members || [];

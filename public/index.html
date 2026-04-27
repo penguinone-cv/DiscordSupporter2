@@ -594,7 +594,7 @@
         async function loadData() {
             showLoading(true);
             try {
-                const response = await fetch('/api/csv');
+                const response = await fetch('api/csv');
                 const result = await response.json();
 
                 if (result.success) {
@@ -616,7 +616,7 @@
         async function loadLogs() {
             showLoadingLogs(true);
             try {
-                const response = await fetch('/api/logs');
+                const response = await fetch('api/logs');
                 const result = await response.json();
 
                 if (result.success) {
@@ -639,7 +639,7 @@
             const tableData = getTableData();
 
             try {
-                const response = await fetch('/api/csv', {
+                const response = await fetch('api/csv', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
