@@ -161,9 +161,11 @@ class WebServer {
                     });
                 }
 
-                // チャンネル一覧を構築（最終更新日時順）- キャッシュ更新後の最新データを使用
+                // チャンネル一覧を構築（全チャンネル + 最終更新日時順）
                 const latestActivity = reminderService.getChannelActivity();
                 const channelMap = new Map();
+
+                // リマインドがあるチャンネルを追加
                 for (const reminder of enrichedReminders) {
                     if (!channelMap.has(reminder.channelId)) {
                         const activity = latestActivity[reminder.channelId];
@@ -172,6 +174,23 @@ class WebServer {
                             name: reminder.channelName,
                             lastActivityAt: activity ? activity.lastActivityAt : reminder.createdAt
                         });
+                    }
+                }
+
+                // Discord APIから全テキストチャンネルを取得して追加
+                if (client) {
+                    for (const [, guild] of client.guilds.cache) {
+                        for (const [, channel] of guild.channels.cache) {
+                            if (channel.isTextBased() && !channel.isThread() && !channelMap.has(channel.id)) {
+                                channelMap.set(channel.id, {
+                                    id: channel.id,
+                                    name: channel.name,
+                                    lastActivityAt: latestActivity[channel.id]
+                                        ? latestActivity[channel.id].lastActivityAt
+                                        : '1970-01-01T00:00:00.000Z'
+                                });
+                            }
+                        }
                     }
                 }
 
