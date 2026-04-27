@@ -143,10 +143,13 @@ class WebServer {
                     if (channelActivity[reminder.channelId]) {
                         channelName = channelActivity[reminder.channelId].channelName;
                     } else if (client) {
-                        // キャッシュにない場合はDiscord APIから取得
+                        // キャッシュにない場合はDiscord APIから取得し、キャッシュを生成・保存
                         try {
-                            const channel = await client.channels.fetch(reminder.channelId);
-                            if (channel) channelName = channel.name;
+                            await reminderService.updateChannelActivity(reminder.channelId, reminder.guildId);
+                            const updated = reminderService.getChannelActivity();
+                            if (updated[reminder.channelId]) {
+                                channelName = updated[reminder.channelId].channelName;
+                            }
                         } catch (e) {
                             logger.warn(`チャンネル名解決失敗: ${reminder.channelId}`);
                         }
@@ -158,11 +161,12 @@ class WebServer {
                     });
                 }
 
-                // チャンネル一覧を構築（最終更新日時順）
+                // チャンネル一覧を構築（最終更新日時順）- キャッシュ更新後の最新データを使用
+                const latestActivity = reminderService.getChannelActivity();
                 const channelMap = new Map();
                 for (const reminder of enrichedReminders) {
                     if (!channelMap.has(reminder.channelId)) {
-                        const activity = channelActivity[reminder.channelId];
+                        const activity = latestActivity[reminder.channelId];
                         channelMap.set(reminder.channelId, {
                             id: reminder.channelId,
                             name: reminder.channelName,
