@@ -412,6 +412,10 @@
         function populateChannelDropdown(chs) {
             const dropdown = document.getElementById('channelDropdown');
             dropdown.innerHTML = '';
+
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
             // 「すべて」
             const allOpt = document.createElement('div');
             allOpt.className = 'filter-option' + (!selectedChannel ? ' active' : '');
@@ -420,20 +424,33 @@
             dropdown.appendChild(allOpt);
 
             for (const ch of chs) {
+                const isInactive = new Date(ch.lastActivityAt) < sixMonthsAgo;
                 const opt = document.createElement('div');
                 opt.className = 'filter-option' + (selectedChannel === ch.name ? ' active' : '');
                 opt.textContent = ch.name;
                 opt.dataset.name = ch.name;
+                opt.dataset.inactive = isInactive ? '1' : '0';
                 opt.onclick = () => selectChannel(ch.name);
+                // デフォルトでは非アクティブチャンネルを非表示
+                if (isInactive) opt.style.display = 'none';
                 dropdown.appendChild(opt);
             }
         }
 
         function filterDropdownOptions(query) {
             const q = query.toLowerCase();
+            const isSearching = q.length > 0;
             document.querySelectorAll('#channelDropdown .filter-option').forEach(opt => {
                 const name = (opt.dataset.name || opt.textContent).toLowerCase();
-                opt.style.display = name.includes(q) ? '' : 'none';
+                const isInactive = opt.dataset.inactive === '1';
+
+                if (isSearching) {
+                    // 検索中: テキストが一致すれば非アクティブでも表示
+                    opt.style.display = name.includes(q) ? '' : 'none';
+                } else {
+                    // 検索なし: 非アクティブは非表示
+                    opt.style.display = isInactive ? 'none' : '';
+                }
             });
         }
 
