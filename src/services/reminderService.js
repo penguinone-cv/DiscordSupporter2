@@ -15,6 +15,8 @@ class ReminderService {
         this.reminders = new Map(); // reminderId -> reminderData
         this.timers = new Map(); // reminderId -> timeout
         this.remindersFilePath = join(__dirname, '..', '..', 'data', 'reminders.json');
+        this.channelActivityFilePath = join(__dirname, '..', '..', 'data', 'channelActivity.json');
+        this.channelActivity = {}; // channelId -> { channelName, guildId, lastActivityAt }
     }
 
     /**
@@ -31,6 +33,8 @@ class ReminderService {
 
         // 保存されているリマインドを読み込む
         this.loadReminders();
+        // チャンネルアクティビティを読み込む
+        this.loadChannelActivity();
         logger.info('リマインドサービスを初期化しました');
     }
 
@@ -106,6 +110,9 @@ JSON形式で以下のように回答してください:
         this.reminders.set(reminderId, reminder);
         this.scheduleReminder(reminder);
         this.saveReminders();
+
+        // チャンネルの最終更新日時をキャッシュ
+        await this.updateChannelActivity(data.channelId, data.guildId);
 
         logger.info(`リマインド作成: ${reminderId} at ${data.remindAt}`);
         return reminder;
@@ -228,6 +235,92 @@ JSON形式で以下のように回答してください:
             logger.info(`${data.length}件のリマインドを読み込みました`);
         } catch (error) {
             logger.error('リマインド読み込みエラー:', error);
+        }
+    }
+
+    /**
+     * リマインド一覧を取得（公開API）
+     * @returns {Array} リマインドデータの配列
+     */
+    getReminders() {
+        return Array.from(this.reminders.values());
+    }
+
+    /**
+     * チャンネルの最終更新日時をDiscord APIから取得してキャッシュ
+     * @param {string} channelId - チャンネルID
+     * @param {string} guildId - ギルドID
+     */
+    async updateChannelActivity(channelId, guildId) {
+        try {
+            const client = global.discordClient;
+            if (!client) {
+                logger.warn('Discord clientが見つからないため、チャンネルアクティビティを更新できません');
+                return;
+            }
+
+            const channel = await client.channels.fetch(channelId);
+            if (!channel) {
+                logger.warn(`チャンネルが見つかりません: ${channelId}`);
+                return;
+            }
+
+            // チャンネルの最新メッセージを1件取得して日時を記録
+            let lastActivityAt = new Date().toISOString();
+            try {
+                const messages = await channel.messages.fetch({ limit: 1 });
+                if (messages.size > 0) {
+                    lastActivityAt = messages.first().createdAt.toISOString();
+                }
+            } catch (fetchError) {
+                logger.warn(`チャンネルメッセージ取得エラー: ${fetchError.message}`);
+            }
+
+            this.channelActivity[channelId] = {
+                channelName: channel.name,
+                guildId: guildId,
+                lastActivityAt: lastActivityAt
+            };
+
+            this.saveChannelActivity();
+            logger.info(`チャンネルアクティビティ更新: ${channel.name} (${lastActivityAt})`);
+        } catch (error) {
+            logger.error('チャンネルアクティビティ更新エラー:', error);
+        }
+    }
+
+    /**
+     * チャンネルアクティビティを取得
+     * @returns {Object} チャンネルアクティビティデータ
+     */
+    getChannelActivity() {
+        return this.channelActivity;
+    }
+
+    /**
+     * チャンネルアクティビティを保存
+     */
+    saveChannelActivity() {
+        try {
+            writeFileSync(this.channelActivityFilePath, JSON.stringify(this.channelActivity, null, 2), 'utf-8');
+        } catch (error) {
+            logger.error('チャンネルアクティビティ保存エラー:', error);
+        }
+    }
+
+    /**
+     * チャンネルアクティビティを読み込む
+     */
+    loadChannelActivity() {
+        try {
+            if (!existsSync(this.channelActivityFilePath)) {
+                return;
+            }
+
+            this.channelActivity = JSON.parse(readFileSync(this.channelActivityFilePath, 'utf-8'));
+            logger.info(`チャンネルアクティビティを読み込みました (${Object.keys(this.channelActivity).length}件)`);
+        } catch (error) {
+            logger.error('チャンネルアクティビティ読み込みエラー:', error);
         }
     }
 }

@@ -4,6 +4,7 @@ import { parse } from 'csv-parse/sync';
 import stringify from 'csv-stringify/lib/sync.js';
 import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
+import reminderService from './reminderService.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -120,6 +121,156 @@ class WebServer {
         // ヘルスチェック
         this.app.get('/api/health', (req, res) => {
             res.json({ status: 'ok' });
+        });
+
+        // リマインド一覧取得API
+        this.app.get('/api/reminders', async (req, res) => {
+            try {
+                const reminders = reminderService.getReminders();
+                const channelActivity = reminderService.getChannelActivity();
+                const client = global.discordClient;
+
+                // チャンネル名を解決
+                const enrichedReminders = [];
+                for (const reminder of reminders) {
+                    let channelName = '不明';
+                    // まずキャッシュから取得
+                    if (channelActivity[reminder.channelId]) {
+                        channelName = channelActivity[reminder.channelId].channelName;
+                    } else if (client) {
+                        // キャッシュにない場合はDiscord APIから取得
+                        try {
+                            const channel = await client.channels.fetch(reminder.channelId);
+                            if (channel) channelName = channel.name;
+                        } catch (e) {
+                            logger.warn(`チャンネル名解決失敗: ${reminder.channelId}`);
+                        }
+                    }
+
+                    enrichedReminders.push({
+                        ...reminder,
+                        channelName
+                    });
+                }
+
+                // チャンネル一覧を構築（最終更新日時順）
+                const channelMap = new Map();
+                for (const reminder of enrichedReminders) {
+                    if (!channelMap.has(reminder.channelId)) {
+                        const activity = channelActivity[reminder.channelId];
+                        channelMap.set(reminder.channelId, {
+                            id: reminder.channelId,
+                            name: reminder.channelName,
+                            lastActivityAt: activity ? activity.lastActivityAt : reminder.createdAt
+                        });
+                    }
+                }
+
+                // 最終更新日時順でソート（降順）
+                const channels = Array.from(channelMap.values())
+                    .sort((a, b) => new Date(b.lastActivityAt) - new Date(a.lastActivityAt));
+
+                res.json({
+                    success: true,
+                    data: enrichedReminders,
+                    channels
+                });
+            } catch (error) {
+                logger.error('リマインド取得エラー:', error);
+                res.status(500).json({
+                    success: false,
+                    error: error.message
+                });
+            }
+        });
+
+        // メンバータグ横断取得API
+        this.app.get('/api/reminders/related', async (req, res) => {
+            try {
+                const { channelName } = req.query;
+                if (!channelName) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'channelNameパラメータが必要です'
+                    });
+                }
+
+                const client = global.discordClient;
+                if (!client) {
+                    return res.json({
+                        success: true,
+                        members: []
+                    });
+                }
+
+                const reminders = reminderService.getReminders();
+                const channelActivity = reminderService.getChannelActivity();
+                const members = [];
+
+                // 全ギルドを走査
+                for (const [, guild] of client.guilds.cache) {
+                    // チャンネル名と同名のロールを検索
+                    const role = guild.roles.cache.find(r => r.name === channelName);
+                    if (!role) continue;
+
+                    // メンバーリストを取得（キャッシュを更新）
+                    try {
+                        await guild.members.fetch();
+                    } catch (e) {
+                        logger.warn(`メンバー取得エラー (${guild.name}): ${e.message}`);
+                        continue;
+                    }
+
+                    // ロールを持つメンバーを走査
+                    for (const [, member] of role.members) {
+                        if (member.user.bot) continue;
+
+                        // このメンバーの他のロール名を取得
+                        const otherRoleNames = member.roles.cache
+                            .filter(r => r.name !== channelName && r.name !== '@everyone')
+                            .map(r => r.name);
+
+                        // 他のロール名に対応するリマインドを検索
+                        const relatedReminders = [];
+                        for (const roleName of otherRoleNames) {
+                            // channelActivityからロール名に一致するチャンネルを検索
+                            const matchingChannelIds = Object.entries(channelActivity)
+                                .filter(([, info]) => info.channelName === roleName)
+                                .map(([id]) => id);
+
+                            // 一致するリマインドを検索
+                            for (const reminder of reminders) {
+                                if (matchingChannelIds.includes(reminder.channelId)) {
+                                    relatedReminders.push({
+                                        channelName: roleName,
+                                        remindAt: reminder.remindAt,
+                                        content: reminder.originalContent
+                                    });
+                                }
+                            }
+                        }
+
+                        if (relatedReminders.length > 0) {
+                            members.push({
+                                name: member.displayName,
+                                avatar: member.user.displayAvatarURL({ size: 32 }),
+                                relatedReminders
+                            });
+                        }
+                    }
+                }
+
+                res.json({
+                    success: true,
+                    members
+                });
+            } catch (error) {
+                logger.error('関連リマインド取得エラー:', error);
+                res.status(500).json({
+                    success: false,
+                    error: error.message
+                });
+            }
         });
 
         // ログ取得API
