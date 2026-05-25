@@ -13,8 +13,10 @@ const __dirname = dirname(__filename);
 class ReminderService {
     constructor() {
         this.reminders = new Map(); // reminderId -> reminderData
+        this.calendarEvents = new Map(); // reminderId -> calendarEventData
         this.timers = new Map(); // reminderId -> timeout
         this.remindersFilePath = join(__dirname, '..', '..', 'data', 'reminders.json');
+        this.calendarEventsFilePath = join(__dirname, '..', '..', 'data', 'calendarEvents.json');
         this.channelActivityFilePath = join(__dirname, '..', '..', 'data', 'channelActivity.json');
         this.channelActivity = {}; // channelId -> { channelName, guildId, lastActivityAt }
     }
@@ -33,6 +35,8 @@ class ReminderService {
 
         // 保存されているリマインドを読み込む
         this.loadReminders();
+        // 保存されているカレンダー予定を読み込む
+        this.loadCalendarEvents();
         // チャンネルアクティビティを読み込む
         this.loadChannelActivity();
         logger.info('リマインドサービスを初期化しました');
@@ -110,6 +114,20 @@ JSON形式で以下のように回答してください:
         this.reminders.set(reminderId, reminder);
         this.scheduleReminder(reminder);
         this.saveReminders();
+
+        // カレンダー予定データも作成して保存
+        const calendarEvent = {
+            id: reminderId,
+            guildId: data.guildId,
+            channelId: data.channelId,
+            messageId: data.messageId,
+            originalContent: data.originalContent,
+            remindAt: data.remindAt,
+            createdAt: reminder.createdAt,
+            userId: data.userId
+        };
+        this.calendarEvents.set(reminderId, calendarEvent);
+        this.saveCalendarEvents();
 
         // チャンネルの最終更新日時をキャッシュ
         await this.updateChannelActivity(data.channelId, data.guildId);
@@ -244,6 +262,46 @@ JSON形式で以下のように回答してください:
      */
     getReminders() {
         return Array.from(this.reminders.values());
+    }
+
+    /**
+     * カレンダー予定を保存
+     */
+    saveCalendarEvents() {
+        try {
+            const data = Array.from(this.calendarEvents.values());
+            writeFileSync(this.calendarEventsFilePath, JSON.stringify(data, null, 2), 'utf-8');
+        } catch (error) {
+            logger.error('カレンダー予定保存エラー:', error);
+        }
+    }
+
+    /**
+     * カレンダー予定を読み込む
+     */
+    loadCalendarEvents() {
+        try {
+            if (!existsSync(this.calendarEventsFilePath)) {
+                return;
+            }
+
+            const data = JSON.parse(readFileSync(this.calendarEventsFilePath, 'utf-8'));
+            data.forEach(event => {
+                this.calendarEvents.set(event.id, event);
+            });
+
+            logger.info(`${data.length}件のカレンダー予定を読み込みました`);
+        } catch (error) {
+            logger.error('カレンダー予定読み込みエラー:', error);
+        }
+    }
+
+    /**
+     * カレンダー予定一覧を取得（公開API）
+     * @returns {Array} カレンダー予定データの配列
+     */
+    getCalendarEvents() {
+        return Array.from(this.calendarEvents.values());
     }
 
     /**

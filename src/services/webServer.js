@@ -128,10 +128,10 @@ class WebServer {
             res.json({ status: 'ok' });
         });
 
-        // リマインド一覧取得API
+        // リマインド一覧取得API（カレンダー用に予定データを返す）
         this.app.get('/api/reminders', async (req, res) => {
             try {
-                const reminders = reminderService.getReminders();
+                const reminders = reminderService.getCalendarEvents();
                 const channelActivity = reminderService.getChannelActivity();
                 const client = global.discordClient;
 
@@ -231,7 +231,7 @@ class WebServer {
                     });
                 }
 
-                const reminders = reminderService.getReminders();
+                const reminders = reminderService.getCalendarEvents();
                 const channelActivity = reminderService.getChannelActivity();
                 const members = [];
 

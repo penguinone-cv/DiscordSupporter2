@@ -206,4 +206,127 @@ describe('ReminderService', () => {
             expect(() => reminderService.loadReminders()).not.toThrow();
         });
     });
+
+    describe('calendarEvents', () => {
+        it('createReminder() はカレンダー予定も同時に保存する', async () => {
+            fs.writeFileSync.mockImplementation(() => {});
+
+            const futureDate = new Date(Date.now() + 60 * 60 * 1000);
+            const data = {
+                guildId: 'guild-1',
+                channelId: 'channel-1',
+                messageId: 'msg-1',
+                originalContent: 'テストメッセージ',
+                remindAt: futureDate.toISOString(),
+                userId: 'user-1',
+            };
+
+            const result = await reminderService.createReminder(data);
+
+            // calendarEvents Map に格納されていることを確認
+            expect(reminderService.calendarEvents.size).toBe(1);
+            const savedEvent = reminderService.calendarEvents.get(result.id);
+            expect(savedEvent).toBeDefined();
+            expect(savedEvent.originalContent).toBe('テストメッセージ');
+
+            // ファイルへの保存が呼ばれたことを確認
+            expect(fs.writeFileSync).toHaveBeenCalled();
+        });
+
+        it('saveCalendarEvents() はカレンダー予定データをJSONファイルに保存する', () => {
+            fs.writeFileSync.mockImplementation(() => {});
+
+            reminderService.calendarEvents.set('event-1', {
+                id: 'event-1',
+                guildId: 'guild-1',
+                channelId: 'ch-1',
+                originalContent: 'test-event',
+            });
+
+            reminderService.saveCalendarEvents();
+
+            expect(fs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('calendarEvents.json'),
+                expect.stringContaining('"event-1"'),
+                'utf-8'
+            );
+        });
+
+        it('loadCalendarEvents() は保存されたカレンダー予定を読み込む', () => {
+            const savedData = [
+                {
+                    id: 'event-saved-1',
+                    guildId: 'guild-1',
+                    channelId: 'ch-1',
+                    originalContent: '保存カレンダーテスト',
+                },
+            ];
+
+            fs.existsSync.mockImplementation((path) => path.includes('calendarEvents.json'));
+            fs.readFileSync.mockImplementation((path) => {
+                if (path.includes('calendarEvents.json')) {
+                    return JSON.stringify(savedData);
+                }
+                return null;
+            });
+
+            reminderService.loadCalendarEvents();
+
+            expect(reminderService.calendarEvents.size).toBe(1);
+            expect(reminderService.calendarEvents.get('event-saved-1').originalContent).toBe('保存カレンダーテスト');
+        });
+
+        it('リマインド実行後もカレンダー予定データは削除されずに保持される', async () => {
+            fs.writeFileSync.mockImplementation(() => {});
+
+            const reminder = {
+                id: 'reminder-to-exec',
+                guildId: 'guild-1',
+                channelId: 'ch-1',
+                messageId: 'msg-1',
+                originalContent: 'テストメッセージ',
+                remindAt: new Date().toISOString(),
+                userId: 'user-1',
+            };
+
+            // reminders と calendarEvents の両方に登録
+            reminderService.reminders.set(reminder.id, reminder);
+            reminderService.calendarEvents.set(reminder.id, { ...reminder });
+
+            // Discord client モックの設定
+            const mockReply = vi.fn().mockResolvedValue({});
+            const mockFetchMessage = vi.fn().mockResolvedValue({
+                reply: mockReply
+            });
+            const mockFetchChannel = vi.fn().mockResolvedValue({
+                name: 'ch-1',
+                messages: {
+                    fetch: mockFetchMessage
+                },
+                guild: {
+                    roles: {
+                        cache: {
+                            find: () => null
+                        }
+                    }
+                }
+            });
+
+            global.discordClient = {
+                channels: {
+                    fetch: mockFetchChannel
+                }
+            };
+
+            await reminderService.executeReminder(reminder);
+
+            // reminders からは削除されている
+            expect(reminderService.reminders.has(reminder.id)).toBe(false);
+            // calendarEvents には残っている
+            expect(reminderService.calendarEvents.has(reminder.id)).toBe(true);
+            expect(reminderService.calendarEvents.get(reminder.id).originalContent).toBe('テストメッセージ');
+
+            global.discordClient = undefined;
+        });
+    });
 });
