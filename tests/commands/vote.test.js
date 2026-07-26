@@ -89,6 +89,7 @@ describe('vote command', () => {
 
             return {
                 id: 'interaction-1',
+                channelId: 'channel-1',
                 user: { tag: 'TestUser#1234', id: 'user-1' },
                 options: {
                     getString: vi.fn().mockImplementation((name) => {
@@ -148,6 +149,10 @@ describe('vote command', () => {
 
             // 投票データが保存された
             expect(interaction.client.votes.size).toBe(1);
+            expect(interaction.client.votes.get('vote-msg-1')).toMatchObject({
+                messageId: 'vote-msg-1',
+                channelId: 'channel-1',
+            });
         });
     });
 

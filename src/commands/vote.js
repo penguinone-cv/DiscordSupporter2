@@ -1,6 +1,26 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import logger from '../utils/logger.js';
 
+const MIN_CANDIDATES = 2;
+const MAX_CANDIDATES = 10;
+
+function parseCandidates(candidateString) {
+    return candidateString.split(/\s+/).filter(candidate => candidate.length > 0);
+}
+
+function createVoteData({ voteMessage, interaction, title, candidates, allowMultiSelect, endTime }) {
+    return {
+        messageId: voteMessage.id,
+        channelId: interaction.channelId ?? voteMessage.channelId,
+        title,
+        candidates,
+        allowMultiSelect,
+        endTime,
+        votes: new Map(),
+        creatorId: interaction.user.id
+    };
+}
+
 /**
  * 投票コマンド
  */
@@ -37,9 +57,9 @@ const voteCommand = {
         const candidateString = interaction.options.getString('candidate');
 
         // 候補をスペースで分割
-        const candidates = candidateString.split(/\s+/).filter(c => c.length > 0);
+        const candidates = parseCandidates(candidateString);
 
-        if (candidates.length < 2) {
+        if (candidates.length < MIN_CANDIDATES) {
             await interaction.reply({
                 content: '❌ 候補は2つ以上指定してください。',
                 ephemeral: true
@@ -47,7 +67,7 @@ const voteCommand = {
             return;
         }
 
-        if (candidates.length > 10) {
+        if (candidates.length > MAX_CANDIDATES) {
             await interaction.reply({
                 content: '❌ 候補は最大10個までです。',
                 ephemeral: true
@@ -100,15 +120,14 @@ const voteCommand = {
         logger.info(`投票作成: "${title}" by ${interaction.user.tag}`);
 
         // 投票データを保存（簡易実装：メモリ内）
-        const voteData = {
-            messageId: voteMessage.id,
+        const voteData = createVoteData({
+            voteMessage,
+            interaction,
             title,
             candidates,
             allowMultiSelect,
-            endTime,
-            votes: new Map(), // userId -> Set<candidateIndex>
-            creatorId: interaction.user.id
-        };
+            endTime
+        });
 
         // グローバルマップに保存（本番環境ではDBに保存すべき）
         if (!interaction.client.votes) {

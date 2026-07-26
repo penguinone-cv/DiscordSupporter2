@@ -142,6 +142,27 @@ describe('messageHandler', () => {
                 })
             );
         });
+
+        it('スレッド内のメッセージは募集判定しない', async () => {
+            const message = createMockMessage({
+                channel: {
+                    name: 'thread',
+                    isThread: vi.fn().mockReturnValue(true),
+                    messages: { fetch: vi.fn() },
+                },
+            });
+            config.get.mockImplementation((key) => {
+                if (key === 'features.mention.enabled') return false;
+                if (key === 'features.recruitmentDetection.enabled') return true;
+                if (key === 'features.autoRole.enabled') return false;
+                return undefined;
+            });
+
+            await handleMessage(message);
+
+            expect(recruitmentDetector.detect).not.toHaveBeenCalled();
+            expect(message.reply).not.toHaveBeenCalled();
+        });
     });
 
     describe('自動ロール付与', () => {

@@ -39,7 +39,10 @@ export default async function handleMessage(message) {
         }
 
         // 2. 募集メッセージ検出
-        if (config.get('features.recruitmentDetection.enabled')) {
+        if (
+            config.get('features.recruitmentDetection.enabled')
+            && !message.channel.isThread?.()
+        ) {
             const detection = await recruitmentDetector.detect(message.content, message.channel);
 
             if (detection.isRecruitment) {

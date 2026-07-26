@@ -62,9 +62,6 @@ describe('interactionHandler', () => {
 
         // interactionHandlerを再読み込み
         vi.resetModules();
-        vi.mock('../../src/utils/logger.js', () => ({
-            default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
-        }));
         const mod = await import('../../src/handlers/interactionHandler.js');
         handleInteraction = mod.default;
 
@@ -92,9 +89,6 @@ describe('interactionHandler', () => {
         }));
 
         vi.resetModules();
-        vi.mock('../../src/utils/logger.js', () => ({
-            default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
-        }));
         const mod = await import('../../src/handlers/interactionHandler.js');
         handleInteraction = mod.default;
 
