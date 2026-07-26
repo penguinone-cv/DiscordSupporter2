@@ -116,7 +116,11 @@ describe('messageHandler', () => {
             const mockRole = { id: 'role-123', name: 'apex' };
             const message = createMockMessage({
                 content: 'Apex一緒にやろう',
-                channel: { name: 'apex', messages: { fetch: vi.fn() } },
+                channel: {
+                    name: 'apex',
+                    parent: { name: 'ゲームチャンネル' },
+                    messages: { fetch: vi.fn() },
+                },
                 guild: {
                     id: 'guild-1',
                     roles: { cache: { find: vi.fn().mockReturnValue(mockRole) } },
@@ -147,6 +151,7 @@ describe('messageHandler', () => {
             const message = createMockMessage({
                 channel: {
                     name: 'thread',
+                    parent: { name: 'ゲームチャンネル' },
                     isThread: vi.fn().mockReturnValue(true),
                     messages: { fetch: vi.fn() },
                 },
@@ -162,6 +167,62 @@ describe('messageHandler', () => {
 
             expect(recruitmentDetector.detect).not.toHaveBeenCalled();
             expect(message.reply).not.toHaveBeenCalled();
+        });
+
+        it('ゲームチャンネル以外のカテゴリーでは募集判定しない', async () => {
+            const message = createMockMessage({
+                channel: {
+                    name: 'general',
+                    parent: { name: '雑談チャンネル' },
+                    messages: { fetch: vi.fn() },
+                },
+            });
+            config.get.mockImplementation((key) => {
+                if (key === 'features.mention.enabled') return false;
+                if (key === 'features.recruitmentDetection.enabled') return true;
+                if (key === 'features.autoRole.enabled') return false;
+                return undefined;
+            });
+
+            await handleMessage(message);
+
+            expect(recruitmentDetector.detect).not.toHaveBeenCalled();
+            expect(message.reply).not.toHaveBeenCalled();
+        });
+
+        it('汎用募集チャンネルでは募集判定し、@everyone に通知する', async () => {
+            const message = createMockMessage({
+                content: '一緒に遊ぶ人募集',
+                channel: {
+                    name: '汎用募集チャンネル',
+                    parent: { name: 'その他' },
+                    messages: { fetch: vi.fn() },
+                },
+            });
+            config.get.mockImplementation((key) => {
+                if (key === 'features.mention.enabled') return false;
+                if (key === 'features.recruitmentDetection.enabled') return true;
+                if (key === 'features.autoRole.enabled') return false;
+                return undefined;
+            });
+            recruitmentDetector.detect.mockResolvedValue({
+                isRecruitment: true,
+                reason: '募集している',
+            });
+
+            await handleMessage(message);
+
+            expect(recruitmentDetector.detect).toHaveBeenCalledWith(
+                '一緒に遊ぶ人募集',
+                message.channel
+            );
+            expect(message.reply).toHaveBeenCalledWith({
+                content: expect.stringContaining('@everyone'),
+                allowedMentions: {
+                    repliedUser: false,
+                    parse: ['everyone'],
+                },
+            });
         });
     });
 

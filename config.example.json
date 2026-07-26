@@ -11,7 +11,8 @@
         "recruitmentDetection": {
             "enabled": true,
             "csvPath": "./recruitment_data.csv",
-            "logPath": "./data/recruitment_log.csv"
+            "logPath": "./data/recruitment_log.csv",
+            "generalChannelName": "汎用募集チャンネル"
         },
         "autoRole": {
             "enabled": true,

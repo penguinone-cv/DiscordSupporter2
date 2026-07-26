@@ -7,6 +7,24 @@ import logger from '../utils/logger.js';
 const processedMessages = new Set();
 const CACHE_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1時間ごとにクリーンアップ
 const CACHE_MAX_SIZE = 10000; // 最大キャッシュサイズ
+const DEFAULT_GAME_CATEGORY_NAME = 'ゲームチャンネル';
+const DEFAULT_GENERAL_RECRUITMENT_CHANNEL_NAME = '汎用募集チャンネル';
+
+function getRecruitmentChannelType(channel) {
+    if (channel.isThread?.()) {
+        return null;
+    }
+
+    const generalChannelName = config.get('features.recruitmentDetection.generalChannelName')
+        || DEFAULT_GENERAL_RECRUITMENT_CHANNEL_NAME;
+    if (channel.name === generalChannelName) {
+        return 'general';
+    }
+
+    const gameCategoryName = config.get('features.autoRole.gameCategoryName')
+        || DEFAULT_GAME_CATEGORY_NAME;
+    return channel.parent?.name === gameCategoryName ? 'game' : null;
+}
 
 // 定期的にキャッシュをクリーンアップ
 setInterval(() => {
@@ -39,28 +57,32 @@ export default async function handleMessage(message) {
         }
 
         // 2. 募集メッセージ検出
+        const recruitmentChannelType = getRecruitmentChannelType(message.channel);
         if (
             config.get('features.recruitmentDetection.enabled')
-            && !message.channel.isThread?.()
+            && recruitmentChannelType
         ) {
             const detection = await recruitmentDetector.detect(message.content, message.channel);
 
             if (detection.isRecruitment) {
-                // チャンネル名と同じロールを検索
-                const roleName = message.channel.name;
-                const role = message.guild?.roles.cache.find(r => r.name === roleName);
-
-                // ロールメンションを含むメッセージを作成
-                const roleMention = role ? `<@&${role.id}>` : '';
-                const content = roleMention
-                    ? `${roleMention} 募集らしきメッセージが送られていそうですよ？`
-                    : `募集らしきメッセージが送られていそうですよ？`;
+                const isGeneralRecruitment = recruitmentChannelType === 'general';
+                const role = isGeneralRecruitment
+                    ? null
+                    : message.guild?.roles.cache.find(r => r.name === message.channel.name);
+                const mention = isGeneralRecruitment
+                    ? '@everyone'
+                    : (role ? `<@&${role.id}>` : '');
+                const content = mention
+                    ? `${mention} 募集らしきメッセージが送られていそうですよ？`
+                    : '募集らしきメッセージが送られていそうですよ？';
 
                 await message.reply({
                     content: content,
                     allowedMentions: {
                         repliedUser: false,
-                        roles: role ? [role.id] : []
+                        ...(isGeneralRecruitment
+                            ? { parse: ['everyone'] }
+                            : { roles: role ? [role.id] : [] })
                     }
                 });
                 logger.info(`募集メッセージ検出: "${message.content.substring(0, 50)}..."`);
