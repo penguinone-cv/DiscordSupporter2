@@ -3,6 +3,8 @@ import logger from '../utils/logger.js';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import database from '../repositories/database.js';
+import gameRepository from '../repositories/gameRepository.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -194,14 +196,21 @@ JSON形式で以下のように回答してください:
                 return;
             }
 
-            // チャンネル名と同じロールを検索
+            // ゲームDBが利用可能なら、稼働中ゲームの保存済みロールIDだけを通知対象にする
             const roleName = channel.name;
-            const role = channel.guild?.roles.cache.find(r => r.name === roleName);
+            const game = database.isInitialized ? gameRepository.findByChannelId(channel.id) : null;
+            const role = game
+                ? (game.lifecycle_status === 'active' && game.current_role_id
+                    ? channel.guild?.roles.cache.get(game.current_role_id)
+                    : null)
+                : channel.guild?.roles.cache.find(r => r.name === roleName);
 
             // リマインドメッセージを送信（ロールメンション）
             let mentionText;
             if (role) {
                 mentionText = `<@&${role.id}>`;
+            } else if (game?.lifecycle_status === 'archived') {
+                mentionText = '';
             } else {
                 // ロールが見つからない場合はチャンネル名を表示
                 mentionText = `@${roleName}`;
@@ -209,7 +218,7 @@ JSON形式で以下のように回答してください:
             }
 
             await message.reply({
-                content: `${mentionText} リマインド: ${reminder.originalContent}`,
+                content: `${mentionText ? `${mentionText} ` : ''}リマインド: ${reminder.originalContent}`,
                 allowedMentions: { roles: role ? [role.id] : [] }
             });
 

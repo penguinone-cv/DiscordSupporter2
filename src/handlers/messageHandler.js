@@ -2,6 +2,9 @@ import recruitmentDetector from '../services/recruitmentDetector.js';
 import roleManager from '../services/roleManager.js';
 import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
+import database from '../repositories/database.js';
+import gameRegistryService from '../services/gameRegistryService.js';
+import channelActivityService from '../services/channelActivityService.js';
 
 // 処理済みメッセージのキャッシュ（重複防止）
 const processedMessages = new Set();
@@ -18,12 +21,19 @@ function getRecruitmentChannelType(channel) {
     const generalChannelName = config.get('features.recruitmentDetection.generalChannelName')
         || DEFAULT_GENERAL_RECRUITMENT_CHANNEL_NAME;
     if (channel.name === generalChannelName) {
-        return 'general';
+        return { type: 'general', game: null };
+    }
+
+    if (database.isInitialized) {
+        const game = gameRegistryService.findActiveGameByChannel(channel);
+        return game ? { type: 'game', game } : null;
     }
 
     const gameCategoryName = config.get('features.autoRole.gameCategoryName')
         || DEFAULT_GAME_CATEGORY_NAME;
-    return channel.parent?.name === gameCategoryName ? 'game' : null;
+    return channel.parent?.name === gameCategoryName
+        ? { type: 'game', game: null }
+        : null;
 }
 
 // 定期的にキャッシュをクリーンアップ
@@ -38,6 +48,13 @@ setInterval(() => {
  * メッセージイベントハンドラ
  */
 export default async function handleMessage(message) {
+    // 活動記録はBot投稿も「全投稿」として記録したうえで、人間投稿のみ休眠判定に使う
+    try {
+        channelActivityService.recordMessage(message);
+    } catch (error) {
+        logger.warn(`チャンネル活動記録エラー: ${error.message}`);
+    }
+
     // Botのメッセージは無視
     if (message.author.bot) return;
 
@@ -65,10 +82,16 @@ export default async function handleMessage(message) {
             const detection = await recruitmentDetector.detect(message.content, message.channel);
 
             if (detection.isRecruitment) {
-                const isGeneralRecruitment = recruitmentChannelType === 'general';
+                const isGeneralRecruitment = recruitmentChannelType.type === 'general';
                 const role = isGeneralRecruitment
                     ? null
-                    : message.guild?.roles.cache.find(r => r.name === message.channel.name);
+                    : (recruitmentChannelType.game
+                        ? roleManager.findRoleForGame(
+                            message.guild,
+                            recruitmentChannelType.game,
+                            message.channel.name
+                        )
+                        : message.guild?.roles.cache.find(r => r.name === message.channel.name));
                 const mention = isGeneralRecruitment
                     ? '@everyone'
                     : (role ? `<@&${role.id}>` : '');

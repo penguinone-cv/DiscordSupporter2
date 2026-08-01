@@ -1,5 +1,8 @@
 import logger from '../utils/logger.js';
 import config from '../config/configLoader.js';
+import database from '../repositories/database.js';
+import gameRepository from '../repositories/gameRepository.js';
+import gameRegistryService from './gameRegistryService.js';
 
 /**
  * ロール管理サービス
@@ -23,8 +26,20 @@ class RoleManager {
      * @returns {boolean}
      */
     isGameChannel(channel) {
+        if (database.isInitialized) {
+            return Boolean(gameRegistryService.findActiveGameByChannel(channel));
+        }
         if (!channel.parent) return false;
         return channel.parent.name === this.gameCategoryName;
+    }
+
+    findRoleForGame(guild, game, channelName = game.display_name) {
+        if (game.current_role_id) {
+            const byId = guild.roles.cache.get(game.current_role_id);
+            if (byId) return byId;
+        }
+        const matches = guild.roles.cache.filter(role => role.name === channelName);
+        return matches.size === 1 ? matches.first() : null;
     }
 
     /**
@@ -39,11 +54,18 @@ class RoleManager {
                 return;
             }
 
-            const roleName = channel.name;
+            const game = database.isInitialized
+                ? gameRegistryService.findActiveGameByChannel(channel)
+                : null;
+            if (database.isInitialized && !game) return;
+
+            const roleName = game?.display_name ?? channel.name;
             const guild = channel.guild;
 
             // ロールを検索
-            let role = guild.roles.cache.find(r => r.name === roleName);
+            let role = game
+                ? this.findRoleForGame(guild, game, channel.name)
+                : guild.roles.cache.find(r => r.name === roleName);
 
             // ロールが存在しない場合は作成
             if (!role) {
@@ -52,6 +74,9 @@ class RoleManager {
                     name: roleName,
                     reason: `${roleName}チャンネルの自動ロール作成`
                 });
+                if (game) gameRepository.setRole(game.id, role.id);
+            } else if (game && game.current_role_id !== role.id) {
+                gameRepository.setRole(game.id, role.id);
             }
 
             // すでにロールを持っているか確認

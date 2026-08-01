@@ -7,6 +7,9 @@
         "apiKey": "YOUR_OPENAI_API_KEY_HERE",
         "model": "gpt-5-nano"
     },
+    "database": {
+        "path": "./data/discord-supporter.db"
+    },
     "features": {
         "recruitmentDetection": {
             "enabled": true,

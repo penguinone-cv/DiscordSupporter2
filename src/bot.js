@@ -9,7 +9,16 @@ import handleMessage from './handlers/messageHandler.js';
 import handleReactionAdd from './handlers/reactionHandler.js';
 import handleInteraction from './handlers/interactionHandler.js';
 import handleChannelCreate from './handlers/channelCreateHandler.js';
+import handleChannelUpdate from './handlers/channelUpdateHandler.js';
+import handleChannelDelete from './handlers/channelDeleteHandler.js';
 import voteCommand from './commands/vote.js';
+import gameAdminCommand from './commands/gameAdmin.js';
+import database from './repositories/database.js';
+import archiveRepository from './repositories/archiveRepository.js';
+import gameRegistryService from './services/gameRegistryService.js';
+import channelActivityService from './services/channelActivityService.js';
+import gameAdminPanelService from './services/gameAdminPanelService.js';
+import maintenanceService from './services/maintenanceService.js';
 import logger from './utils/logger.js';
 
 /**
@@ -26,6 +35,9 @@ class Bot {
     async initialize() {
         // 設定を読み込み
         config.load();
+
+        // 永続データを準備してからDiscordへ接続する
+        database.initialize(config.get('database.path') || './data/discord-supporter.db');
 
         // Discord Clientを作成
         this.client = new Client({
@@ -47,7 +59,7 @@ class Bot {
         openaiService.initialize();
         recruitmentDetector.initialize();
         roleManager.initialize();
-        reminderService.initialize();
+        await reminderService.initialize();
 
         // グローバルクライアント参照を設定（リマインド実行用）
         global.discordClient = this.client;
@@ -71,9 +83,25 @@ class Bot {
      */
     registerEventHandlers() {
         // Bot準備完了
-        this.client.once('ready', () => {
+        this.client.once('ready', async () => {
             logger.info(`✅ ${this.client.user.tag} でログインしました`);
             logger.info(`サーバー数: ${this.client.guilds.cache.size}`);
+            try {
+                const interrupted = archiveRepository.markInterruptedOperations();
+                if (interrupted) logger.warn(`${interrupted}件の中断操作を要確認状態へ移しました`);
+                await gameRegistryService.reconcileAll(this.client);
+                // 活動履歴の走査は起動を妨げないよう、ready後に順次実行する
+                channelActivityService.reconcileAll(this.client)
+                    .then(async () => {
+                        for (const guild of this.client.guilds.cache.values()) {
+                            await gameAdminPanelService.refreshPanel(guild);
+                        }
+                    })
+                    .catch(error => logger.error('起動時活動整合エラー:', error));
+                maintenanceService.start(this.client);
+            } catch (error) {
+                logger.error('起動時ゲーム管理同期エラー:', error);
+            }
         });
 
         // メッセージ作成
@@ -85,17 +113,12 @@ class Bot {
         // チャンネル作成
         this.client.on('channelCreate', handleChannelCreate);
 
+        // チャンネル更新・削除
+        this.client.on('channelUpdate', handleChannelUpdate);
+        this.client.on('channelDelete', handleChannelDelete);
+
         // インタラクション（スラッシュコマンド、ボタンなど）
-        this.client.on('interactionCreate', async (interaction) => {
-            // ボタンインタラクション
-            if (interaction.isButton() && interaction.customId.startsWith('vote_')) {
-                await voteCommand.handleButton(interaction);
-            }
-            // スラッシュコマンド
-            else if (interaction.isChatInputCommand()) {
-                await handleInteraction(interaction);
-            }
-        });
+        this.client.on('interactionCreate', handleInteraction);
 
         // エラーハンドリング
         this.client.on('error', (error) => {
@@ -108,7 +131,8 @@ class Bot {
      */
     async registerSlashCommands() {
         const commands = [
-            voteCommand.data.toJSON()
+            voteCommand.data.toJSON(),
+            gameAdminCommand.data.toJSON()
         ];
 
         const rest = new REST({ version: '10' }).setToken(config.get('discord.token'));
@@ -141,6 +165,13 @@ class Bot {
         if (config.get('webui.enabled')) {
             webServer.start();
         }
+    }
+
+    async stop() {
+        maintenanceService.stop();
+        webServer.stop();
+        this.client?.destroy();
+        database.close();
     }
 }
 

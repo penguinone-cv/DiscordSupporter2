@@ -5,6 +5,13 @@ npm-debug.log
 .gitignore
 README.md
 .env
+config.json
+data
+logs
+*.log
+reminders.json
+recruitment_log.csv
+tests
 *.md
 Dockerfile
 docker-compose.yml

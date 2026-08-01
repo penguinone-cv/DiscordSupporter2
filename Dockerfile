@@ -1,16 +1,18 @@
-# Node.js 20 LTS (Alpine)
-FROM node:20-alpine
+# Node.js 24 LTS: better-sqlite3のネイティブビルドに備えた依存関係ステージ
+FROM node:24-bookworm-slim AS dependencies
 
-# 作業ディレクトリを設定
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# package.jsonとpackage-lock.jsonをコピー
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-# 依存関係をインストール
-RUN npm install --production
-
-# アプリケーションのソースをコピー
+# 実行用イメージにはビルドツールを含めない
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # ポート3000を公開（WebUI用）

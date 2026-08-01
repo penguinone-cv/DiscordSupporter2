@@ -1,4 +1,6 @@
 import logger from '../utils/logger.js';
+import database from '../repositories/database.js';
+import gameRegistryService from '../services/gameRegistryService.js';
 
 /**
  * チャンネル作成イベントハンドラ
@@ -12,6 +14,17 @@ export default async function handleChannelCreate(channel) {
 
         // DMチャンネルは無視
         if (!channel.guild) {
+            return;
+        }
+
+        // スレッドはゲームチャンネルとして登録しない
+        if (channel.isThread?.()) {
+            return;
+        }
+
+        // DB初期化後は、設定済みゲームカテゴリ内だけを対象にする
+        const game = gameRegistryService.registerChannel(channel);
+        if (database.isInitialized && !game) {
             return;
         }
 
