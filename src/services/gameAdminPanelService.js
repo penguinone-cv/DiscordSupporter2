@@ -131,12 +131,12 @@ class GameAdminPanelService {
         }
         components.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`game:list:${mode}:${Math.max(0, page - 1)}`)
+                .setCustomId(`game:list:${mode}:${page - 1}`)
                 .setLabel('前へ')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(page === 0),
             new ButtonBuilder()
-                .setCustomId(`game:list:${mode}:${Math.min(pages - 1, page + 1)}`)
+                .setCustomId(`game:list:${mode}:${page + 1}`)
                 .setLabel('次へ')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(page >= pages - 1)
