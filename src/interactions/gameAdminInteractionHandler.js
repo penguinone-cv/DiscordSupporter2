@@ -5,6 +5,7 @@ import gameRegistryService from '../services/gameRegistryService.js';
 import channelActivityService from '../services/channelActivityService.js';
 import gameAdminPanelService from '../services/gameAdminPanelService.js';
 import gameArchiveService from '../services/gameArchiveService.js';
+import gameReturnRequestService from '../services/gameReturnRequestService.js';
 
 function assertAdministrator(interaction) {
     if (!interaction.inGuild()) throw new Error('サーバー内でのみ操作できます');
@@ -76,6 +77,34 @@ export default async function handleGameAdminInteraction(interaction) {
         return interaction.editReply(
             `再同期しました。登録 ${registry.registered}件、活動確認 ${activity.reconciled}件、未確定 ${activity.unknown}件です。`
         );
+    }
+
+    if (action === 'restore-dismiss') {
+        const [snapshotId] = args;
+        const result = gameReturnRequestService.dismiss(
+            interaction.guildId,
+            Number(snapshotId)
+        );
+        await gameAdminPanelService.refreshPanel(interaction.guild);
+        return interaction.update(result.payload);
+    }
+
+    if (action === 'restore-alert') {
+        const [gameId] = args;
+        const game = assertGuildGame(interaction, gameId);
+        if (game.lifecycle_status !== 'archived') {
+            throw new Error('このゲームはすでに再稼働しています');
+        }
+        return interaction.reply({
+            ...gameAdminPanelService.buildConfirmation(
+                interaction.guild,
+                Number(gameId),
+                'restore',
+                'archived',
+                0
+            ),
+            flags: MessageFlags.Ephemeral
+        });
     }
 
     if (action === 'archive' || action === 'restore') {

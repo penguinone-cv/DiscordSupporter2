@@ -47,6 +47,34 @@ class GuildSettingsRepository {
         `).run(messageId, new Date().toISOString(), guildId);
     }
 
+    setMemberPanelSettings(guildId, { channelId, restoreRequestThreshold = 5 }) {
+        const result = database.connection().prepare(`
+            UPDATE guild_settings
+            SET member_panel_channel_id = ?, restore_request_threshold = ?,
+                member_panel_message_id = CASE
+                    WHEN member_panel_channel_id = ? THEN member_panel_message_id
+                    ELSE NULL
+                END,
+                updated_at = ?
+            WHERE guild_id = ?
+        `).run(
+            channelId,
+            restoreRequestThreshold,
+            channelId,
+            new Date().toISOString(),
+            guildId
+        );
+        return result.changes ? this.find(guildId) : null;
+    }
+
+    setMemberPanelMessage(guildId, messageId) {
+        database.connection().prepare(`
+            UPDATE guild_settings
+            SET member_panel_message_id = ?, updated_at = ?
+            WHERE guild_id = ?
+        `).run(messageId, new Date().toISOString(), guildId);
+    }
+
     listConfigured() {
         if (!database.isInitialized) return [];
         return database.connection().prepare(`
@@ -57,4 +85,3 @@ class GuildSettingsRepository {
 }
 
 export default new GuildSettingsRepository();
-

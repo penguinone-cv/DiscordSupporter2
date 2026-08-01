@@ -18,6 +18,8 @@ import archiveRepository from './repositories/archiveRepository.js';
 import gameRegistryService from './services/gameRegistryService.js';
 import channelActivityService from './services/channelActivityService.js';
 import gameAdminPanelService from './services/gameAdminPanelService.js';
+import gameMemberPanelService from './services/gameMemberPanelService.js';
+import gameReturnRequestService from './services/gameReturnRequestService.js';
 import maintenanceService from './services/maintenanceService.js';
 import logger from './utils/logger.js';
 
@@ -95,6 +97,8 @@ class Bot {
                     .then(async () => {
                         for (const guild of this.client.guilds.cache.values()) {
                             await gameAdminPanelService.refreshPanel(guild);
+                            await gameMemberPanelService.refreshPanel(guild);
+                            await gameReturnRequestService.reconcileGuild(guild);
                         }
                     })
                     .catch(error => logger.error('起動時活動整合エラー:', error));

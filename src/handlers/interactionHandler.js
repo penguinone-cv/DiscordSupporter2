@@ -14,6 +14,13 @@ export default async function handleInteraction(interaction) {
         }
 
         if ((interaction.isButton?.() || interaction.isStringSelectMenu?.())
+            && interaction.customId.startsWith('game-user:')) {
+            const { default: handleGameMemberInteraction } = await import('../interactions/gameMemberInteractionHandler.js');
+            await handleGameMemberInteraction(interaction);
+            return;
+        }
+
+        if ((interaction.isButton?.() || interaction.isStringSelectMenu?.())
             && interaction.customId.startsWith('game:')) {
             const { default: handleGameAdminInteraction } = await import('../interactions/gameAdminInteractionHandler.js');
             await handleGameAdminInteraction(interaction);

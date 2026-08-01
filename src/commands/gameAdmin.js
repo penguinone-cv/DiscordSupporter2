@@ -8,6 +8,8 @@ import guildSettingsRepository from '../repositories/guildSettingsRepository.js'
 import gameRegistryService from '../services/gameRegistryService.js';
 import channelActivityService from '../services/channelActivityService.js';
 import gameAdminPanelService from '../services/gameAdminPanelService.js';
+import gameMemberPanelService from '../services/gameMemberPanelService.js';
+import gameReturnRequestService from '../services/gameReturnRequestService.js';
 
 function assertAdministrator(interaction) {
     if (!interaction.inGuild()) throw new Error('サーバー内でのみ使用できます');
@@ -57,6 +59,20 @@ const gameAdminCommand = {
             .setName('panel')
             .setDescription('管理パネルを再設置または更新します'))
         .addSubcommand(subcommand => subcommand
+            .setName('member-panel')
+            .setDescription('一般ユーザー用のゲームパネルを設置します')
+            .addChannelOption(option => option
+                .setName('channel')
+                .setDescription('一般ユーザー用パネルを設置するチャンネル')
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(true))
+            .addIntegerOption(option => option
+                .setName('restore_threshold')
+                .setDescription('管理者へ通知する復帰希望人数')
+                .setMinValue(1)
+                .setMaxValue(100)
+                .setRequired(false)))
+        .addSubcommand(subcommand => subcommand
             .setName('reconcile')
             .setDescription('ゲームチャンネルと活動状況を再同期します'))
         .addSubcommand(subcommand => subcommand
@@ -95,6 +111,27 @@ const gameAdminCommand = {
             const message = await gameAdminPanelService.ensurePanel(interaction.guild);
             if (!message) throw new Error('先に /game-admin setup を実行してください');
             await interaction.editReply(`管理パネルを更新しました: ${message.url}`);
+            return;
+        }
+
+        if (subcommand === 'member-panel') {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const settings = guildSettingsRepository.find(interaction.guildId);
+            if (!settings?.game_category_id) throw new Error('先に /game-admin setup を実行してください');
+            const channel = interaction.options.getChannel('channel', true);
+            const restoreRequestThreshold = interaction.options.getInteger('restore_threshold')
+                ?? settings.restore_request_threshold
+                ?? 5;
+            if (!channel.isSendable()) throw new Error('指定したチャンネルへBotが投稿できません');
+            guildSettingsRepository.setMemberPanelSettings(interaction.guildId, {
+                channelId: channel.id,
+                restoreRequestThreshold
+            });
+            const message = await gameMemberPanelService.ensurePanel(interaction.guild);
+            await gameReturnRequestService.reconcileGuild(interaction.guild);
+            await interaction.editReply(
+                `一般ユーザー用パネルを設定しました。復帰希望 ${restoreRequestThreshold}人で管理者へ通知します: ${message.url}`
+            );
             return;
         }
 

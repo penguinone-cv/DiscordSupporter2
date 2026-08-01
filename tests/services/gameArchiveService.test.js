@@ -4,6 +4,7 @@ import database from '../../src/repositories/database.js';
 import gameRepository from '../../src/repositories/gameRepository.js';
 import guildSettingsRepository from '../../src/repositories/guildSettingsRepository.js';
 import archiveRepository from '../../src/repositories/archiveRepository.js';
+import gameInterestRepository from '../../src/repositories/gameInterestRepository.js';
 import gameArchiveService from '../../src/services/gameArchiveService.js';
 
 function createGuildFixture({ failTopic = false } = {}) {
@@ -147,5 +148,43 @@ describe('gameArchiveService', () => {
             SELECT * FROM game_archive_operations WHERE game_id = ? ORDER BY id DESC LIMIT 1
         `).get(game.id);
         expect(operation.status).toBe('rolled_back');
+    });
+
+    it('再稼働時に現在の復帰希望通知を解決済みにする', async () => {
+        const fixture = createGuildFixture();
+        const game = prepareGame(fixture);
+        await gameArchiveService.archive({
+            guild: fixture.guild,
+            gameId: game.id,
+            userId: 'admin-1'
+        });
+        const archived = gameInterestRepository.findCurrentArchivedGame(
+            fixture.guild.id,
+            game.id
+        );
+        gameInterestRepository.toggleRestoreRequest({
+            guildId: fixture.guild.id,
+            gameId: game.id,
+            snapshotId: archived.archive_snapshot_id,
+            userId: 'user-1'
+        });
+        gameInterestRepository.reserveAlert({
+            snapshotId: archived.archive_snapshot_id,
+            gameId: game.id,
+            guildId: fixture.guild.id,
+            adminChannelId: 'admin-1',
+            count: 1
+        });
+
+        await gameArchiveService.restore({
+            guild: fixture.guild,
+            gameId: game.id,
+            userId: 'admin-1'
+        });
+
+        expect(gameInterestRepository.findAlert(archived.archive_snapshot_id).status)
+            .toBe('resolved');
+        expect(gameInterestRepository.findCurrentArchivedGame(fixture.guild.id, game.id))
+            .toBeNull();
     });
 });

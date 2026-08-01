@@ -3,6 +3,7 @@ import gameRepository from '../repositories/gameRepository.js';
 import guildSettingsRepository from '../repositories/guildSettingsRepository.js';
 import archiveRepository from '../repositories/archiveRepository.js';
 import archiveCategoryService from './archiveCategoryService.js';
+import gameReturnRequestService from './gameReturnRequestService.js';
 import logger from '../utils/logger.js';
 
 function serializeChannel(channel) {
@@ -171,6 +172,11 @@ class GameArchiveService {
                 status: 'succeeded',
                 phase: 'completed'
             });
+            await gameReturnRequestService.resolveAfterRestore({
+                guild,
+                game: active,
+                snapshotId: parsed.id
+            });
             return active;
         } catch (error) {
             logger.error(`ゲーム再稼働失敗 (game=${game.id}):`, error);
@@ -205,6 +211,11 @@ class GameArchiveService {
             status: operation.operation_type === 'archive' ? 'rolled_back' : 'succeeded',
             phase: 'repaired',
             error: null
+        });
+        await gameReturnRequestService.resolveAfterRestore({
+            guild,
+            game: active,
+            snapshotId: snapshot.id
         });
         return active;
     }

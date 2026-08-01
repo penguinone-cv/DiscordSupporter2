@@ -9,6 +9,7 @@ import guildSettingsRepository from '../repositories/guildSettingsRepository.js'
 import gameRepository from '../repositories/gameRepository.js';
 import activityRepository from '../repositories/activityRepository.js';
 import archiveRepository from '../repositories/archiveRepository.js';
+import gameInterestRepository from '../repositories/gameInterestRepository.js';
 import channelActivityService from './channelActivityService.js';
 import logger from '../utils/logger.js';
 
@@ -24,6 +25,7 @@ class GameAdminPanelService {
         const counts = gameRepository.counts(guild.id);
         const dormant = channelActivityService.listDormantCandidates(guild.id).length;
         const attention = archiveRepository.listAttention(guild.id).length;
+        const restoreRequests = gameInterestRepository.summarizeRestoreRequests(guild.id);
         const guildChannelCount = guild.channels.cache.filter(channel => !channel.isThread?.()).size;
         const embed = new EmbedBuilder()
             .setColor(attention > 0 ? 0xED4245 : 0x5865F2)
@@ -34,6 +36,7 @@ class GameAdminPanelService {
                 `休止中：**${counts.archived}件**`,
                 `紐付け切れ：**${counts.missing}件**`,
                 `要確認操作：**${attention}件**`,
+                `復帰希望：**${restoreRequests.games}ゲーム / ${restoreRequests.users}人**`,
                 '',
                 `チャンネル：**${guildChannelCount} / 500**`,
                 `ロール：**${guild.roles.cache.size} / 250**`
@@ -96,7 +99,7 @@ class GameAdminPanelService {
 
     getList(guildId, mode) {
         if (mode === 'dormant') return channelActivityService.listDormantCandidates(guildId);
-        if (mode === 'archived') return gameRepository.listByGuild(guildId, 'archived');
+        if (mode === 'archived') return gameInterestRepository.listArchivedGames(guildId);
         return gameRepository.listByGuild(guildId);
     }
 
@@ -125,7 +128,9 @@ class GameAdminPanelService {
                 .addOptions(pageGames.map(game => ({
                     label: game.display_name.slice(0, 100),
                     value: String(game.id),
-                    description: game.lifecycle_status === 'archived' ? '休止中' : '稼働中'
+                    description: game.lifecycle_status === 'archived'
+                        ? `休止中・復帰希望 ${game.restore_request_count ?? 0}人`
+                        : '稼働中'
                 })));
             components.push(new ActionRowBuilder().addComponents(select));
         }
@@ -150,6 +155,9 @@ class GameAdminPanelService {
         const activity = game.current_channel_id
             ? activityRepository.findByChannelId(game.current_channel_id)
             : null;
+        const archivedGame = game.lifecycle_status === 'archived'
+            ? gameInterestRepository.findCurrentArchivedGame(guild.id, game.id)
+            : null;
         const embed = new EmbedBuilder()
             .setColor(game.lifecycle_status === 'archived' ? 0x747F8D : 0x57F287)
             .setTitle(`🎮 ${game.display_name}`)
@@ -159,6 +167,7 @@ class GameAdminPanelService {
                 `最終ユーザー投稿：${discordTimestamp(activity?.last_user_message_at)}`,
                 `活動確認：${activity?.reconciliation_status === 'confirmed' ? '確定' : '未確定'}`,
                 `アーカイブ対象：${game.archive_excluded ? '対象外' : '対象'}`
+                    + (archivedGame ? `\n復帰希望：**${archivedGame.restore_request_count}人**` : '')
             ].join('\n'));
 
         const actionRow = new ActionRowBuilder();
