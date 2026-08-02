@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+    buildMainPanel,
+    buildPreferenceEditor,
+    updatePreferencePage,
     buildArchivedList,
     buildGameDetail,
     toggle,
     refreshPanel
 } = vi.hoisted(() => ({
+    buildMainPanel: vi.fn(),
+    buildPreferenceEditor: vi.fn(),
+    updatePreferencePage: vi.fn(),
     buildArchivedList: vi.fn(),
     buildGameDetail: vi.fn(),
     toggle: vi.fn(),
@@ -13,7 +19,13 @@ const {
 }));
 
 vi.mock('../../src/services/gameMemberPanelService.js', () => ({
-    default: { buildArchivedList, buildGameDetail }
+    default: {
+        buildMainPanel,
+        buildPreferenceEditor,
+        updatePreferencePage,
+        buildArchivedList,
+        buildGameDetail
+    }
 }));
 vi.mock('../../src/services/gameReturnRequestService.js', () => ({
     default: { toggle }
@@ -27,6 +39,9 @@ import handleGameMemberInteraction from '../../src/interactions/gameMemberIntera
 describe('gameMemberInteractionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        buildMainPanel.mockReturnValue({ content: 'main-panel' });
+        buildPreferenceEditor.mockReturnValue({ content: 'preference-editor' });
+        updatePreferencePage.mockReturnValue({ content: 'preference-saved' });
         buildArchivedList.mockReturnValue({ content: 'archived-list' });
         buildGameDetail.mockReturnValue({ content: 'game-detail' });
         toggle.mockResolvedValue({ requested: true, count: 1 });
@@ -40,6 +55,7 @@ describe('gameMemberInteractionHandler', () => {
             guild: { id: 'guild-1' },
             guildId: 'guild-1',
             user: { id: 'user-1', bot: false },
+            values: [],
             message: { flags: { has: () => false } },
             reply: vi.fn().mockResolvedValue(undefined),
             update: vi.fn().mockResolvedValue(undefined),
@@ -48,6 +64,39 @@ describe('gameMemberInteractionHandler', () => {
             ...overrides
         };
     }
+
+    it('公開パネルからゲーム希望編集を本人だけに表示する', async () => {
+        const target = interaction({ customId: 'game-user:preferences:2' });
+
+        await handleGameMemberInteraction(target);
+
+        expect(buildPreferenceEditor).toHaveBeenCalledWith(
+            target.guild,
+            'user-1',
+            2
+        );
+        expect(target.reply).toHaveBeenCalledWith(expect.objectContaining({
+            content: 'preference-editor'
+        }));
+        expect(target.reply.mock.calls[0][0].flags).toBeTruthy();
+    });
+
+    it('選択したゲーム希望を保存して編集画面を更新する', async () => {
+        const target = interaction({
+            customId: 'game-user:preferences-save:1',
+            values: ['12', '13']
+        });
+
+        await handleGameMemberInteraction(target);
+
+        expect(updatePreferencePage).toHaveBeenCalledWith(
+            target.guild,
+            'user-1',
+            1,
+            ['12', '13']
+        );
+        expect(target.update).toHaveBeenCalledWith({ content: 'preference-saved' });
+    });
 
     it('公開パネルから休止中一覧を本人だけに表示する', async () => {
         const target = interaction();

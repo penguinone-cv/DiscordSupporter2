@@ -21,6 +21,29 @@ export default async function handleGameMemberInteraction(interaction) {
     assertGuildMember(interaction);
     const [, action, ...args] = interaction.customId.split(':');
 
+    if (action === 'home') {
+        return show(interaction, gameMemberPanelService.buildMainPanel());
+    }
+
+    if (action === 'preferences') {
+        const [pageString = '0'] = args;
+        return show(interaction, gameMemberPanelService.buildPreferenceEditor(
+            interaction.guild,
+            interaction.user.id,
+            Number(pageString) || 0
+        ));
+    }
+
+    if (action === 'preferences-save') {
+        const [pageString = '0'] = args;
+        return interaction.update(gameMemberPanelService.updatePreferencePage(
+            interaction.guild,
+            interaction.user.id,
+            Number(pageString) || 0,
+            interaction.values ?? []
+        ));
+    }
+
     if (action === 'archived') {
         const [pageString = '0'] = args;
         return show(interaction, gameMemberPanelService.buildArchivedList(

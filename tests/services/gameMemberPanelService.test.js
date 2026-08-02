@@ -25,13 +25,17 @@ describe('gameMemberPanelService', () => {
         database.close();
     });
 
-    function prepareArchivedGame() {
-        const game = gameRepository.registerChannel({
+    function prepareActiveGame({ channelId = 'channel-active', name = 'apex' } = {}) {
+        return gameRepository.registerChannel({
             guildId: guild.id,
-            channelId: 'channel-1',
-            channelName: 'apex',
+            channelId,
+            channelName: name,
             parentCategoryId: 'category-1'
         });
+    }
+
+    function prepareArchivedGame() {
+        const game = prepareActiveGame({ channelId: 'channel-1' });
         const operation = archiveRepository.beginOperation({
             gameId: game.id,
             type: 'archive',
@@ -45,6 +49,104 @@ describe('gameMemberPanelService', () => {
         gameRepository.setArchived(game.id);
         return { game, snapshotId: operation.snapshot_id };
     }
+
+    it('公開パネルに希望編集と休止中ゲームの入口を表示する', () => {
+        const payload = gameMemberPanelService.buildMainPanel();
+        const buttons = payload.components[0].toJSON().components;
+
+        expect(buttons.map(button => button.custom_id)).toEqual([
+            'game-user:preferences:0',
+            'game-user:archived:0'
+        ]);
+    });
+
+    it('稼働中ゲームを複数選択でき、現在の希望を初期選択へ反映する', () => {
+        const first = prepareActiveGame({ channelId: 'channel-1', name: 'apex' });
+        const second = prepareActiveGame({ channelId: 'channel-2', name: 'minecraft' });
+        gameInterestRepository.replacePreferencesForGames({
+            guildId: guild.id,
+            userId: 'user-1',
+            gameIds: [first.id, second.id],
+            preferredGameIds: [second.id]
+        });
+
+        const payload = gameMemberPanelService.buildPreferenceEditor(guild, 'user-1', 0);
+        const select = payload.components[0].toJSON().components[0];
+        const navigation = payload.components[1].toJSON().components;
+
+        expect(select.custom_id).toBe('game-user:preferences-save:0');
+        expect(select.min_values).toBe(0);
+        expect(select.max_values).toBe(2);
+        expect(select.options).toEqual([
+            expect.objectContaining({ label: 'apex', value: String(first.id), default: false }),
+            expect.objectContaining({ label: 'minecraft', value: String(second.id), default: true })
+        ]);
+        expect(navigation.map(button => button.custom_id)).toEqual([
+            'game-user:preferences:-1',
+            'game-user:preferences:1',
+            'game-user:home'
+        ]);
+        expect(navigation.slice(0, 2).every(button => button.disabled)).toBe(true);
+    });
+
+    it('表示ページの選択だけを保存する', () => {
+        const first = prepareActiveGame({ channelId: 'channel-1', name: 'apex' });
+        const second = prepareActiveGame({ channelId: 'channel-2', name: 'minecraft' });
+
+        const payload = gameMemberPanelService.updatePreferencePage(
+            guild,
+            'user-1',
+            0,
+            [String(second.id)]
+        );
+        const games = gameInterestRepository.listActivePreferenceGames(guild.id, 'user-1');
+
+        expect(games).toEqual([
+            expect.objectContaining({ id: first.id, preferred: 0 }),
+            expect.objectContaining({ id: second.id, preferred: 1 })
+        ]);
+        expect(payload.embeds[0].toJSON().description).toContain('現在の選択：**1件**');
+
+        gameMemberPanelService.updatePreferencePage(guild, 'user-1', 0, []);
+        expect(gameInterestRepository.listActivePreferenceGames(guild.id, 'user-1'))
+            .toEqual([
+                expect.objectContaining({ id: first.id, preferred: 0 }),
+                expect.objectContaining({ id: second.id, preferred: 0 })
+            ]);
+    });
+
+    it('26件以上のゲームを25件ずつページ分割する', () => {
+        for (let index = 0; index < 26; index += 1) {
+            prepareActiveGame({
+                channelId: `channel-${index}`,
+                name: `game-${String(index).padStart(2, '0')}`
+            });
+        }
+
+        const firstPage = gameMemberPanelService.buildPreferenceEditor(guild, 'user-1', 0);
+        const secondPage = gameMemberPanelService.buildPreferenceEditor(guild, 'user-1', 1);
+        const firstSelect = firstPage.components[0].toJSON().components[0];
+        const secondSelect = secondPage.components[0].toJSON().components[0];
+        const secondNavigation = secondPage.components[1].toJSON().components;
+
+        expect(firstSelect.options).toHaveLength(25);
+        expect(firstSelect.max_values).toBe(25);
+        expect(secondSelect.options).toHaveLength(1);
+        expect(secondSelect.max_values).toBe(1);
+        expect(secondNavigation[0].disabled).toBe(false);
+        expect(secondNavigation[1].disabled).toBe(true);
+    });
+
+    it('表示ページにないゲームIDは保存しない', () => {
+        prepareActiveGame({ channelId: 'channel-1', name: 'apex' });
+
+        expect(() => gameMemberPanelService.updatePreferencePage(
+            guild,
+            'user-1',
+            0,
+            ['999']
+        )).toThrow('編集対象外のゲームは選択できません');
+    });
 
     it('1ページだけでも全コンポーネントのcustom IDが重複しない', () => {
         prepareArchivedGame();

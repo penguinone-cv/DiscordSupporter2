@@ -65,6 +65,74 @@ describe('gameInterestRepository', () => {
         `).get('guild-1', 'user-1', game.id)).toBeTruthy();
     });
 
+    it('稼働中ゲームの希望を編集し、ページ外と休止中の希望を保持する', () => {
+        const first = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const second = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-2',
+            channelName: 'minecraft',
+            parentCategoryId: 'category-1'
+        });
+
+        gameInterestRepository.replacePreferencesForGames({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            gameIds: [first.id, second.id],
+            preferredGameIds: [first.id]
+        });
+        gameInterestRepository.replacePreferencesForGames({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            gameIds: [second.id],
+            preferredGameIds: [second.id]
+        });
+
+        expect(gameInterestRepository.listActivePreferenceGames('guild-1', 'user-1'))
+            .toEqual([
+                expect.objectContaining({ id: first.id, preferred: 1 }),
+                expect.objectContaining({ id: second.id, preferred: 1 })
+            ]);
+
+        gameRepository.setArchived(first.id);
+        expect(gameInterestRepository.listActivePreferenceGames('guild-1', 'user-1'))
+            .toEqual([expect.objectContaining({ id: second.id, preferred: 1 })]);
+        expect(database.connection().prepare(`
+            SELECT 1 FROM user_game_preferences
+            WHERE guild_id = ? AND user_id = ? AND game_id = ?
+        `).get('guild-1', 'user-1', first.id)).toBeTruthy();
+
+        gameRepository.setActive(first.id);
+        expect(gameInterestRepository.listActivePreferenceGames('guild-1', 'user-1'))
+            .toContainEqual(expect.objectContaining({ id: first.id, preferred: 1 }));
+    });
+
+    it('編集範囲外のゲームを希望へ追加できない', () => {
+        const first = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const second = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-2',
+            channelName: 'minecraft',
+            parentCategoryId: 'category-1'
+        });
+
+        expect(() => gameInterestRepository.replacePreferencesForGames({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            gameIds: [first.id],
+            preferredGameIds: [second.id]
+        })).toThrow('編集対象外のゲームは選択できません');
+    });
+
     it('再アーカイブ時は新しい周期を0人から開始する', () => {
         const first = archiveGame();
         gameInterestRepository.toggleRestoreRequest({

@@ -5,6 +5,75 @@ function nowIso() {
 }
 
 class GameInterestRepository {
+    listActivePreferenceGames(guildId, userId) {
+        if (!database.isInitialized) return [];
+        return database.connection().prepare(`
+            SELECT g.*,
+                   CASE WHEN preference.game_id IS NULL THEN 0 ELSE 1 END AS preferred
+            FROM games g
+            LEFT JOIN user_game_preferences preference
+              ON preference.guild_id = g.guild_id
+             AND preference.user_id = ?
+             AND preference.game_id = g.id
+            WHERE g.guild_id = ?
+              AND g.lifecycle_status = 'active'
+              AND g.current_channel_id IS NOT NULL
+            ORDER BY g.display_name, g.id
+        `).all(userId, guildId);
+    }
+
+    replacePreferencesForGames({ guildId, userId, gameIds, preferredGameIds }) {
+        const scopedIds = [...new Set(gameIds.map(Number))];
+        const preferredIds = [...new Set(preferredGameIds.map(Number))];
+        if (scopedIds.some(id => !Number.isSafeInteger(id) || id <= 0)
+            || preferredIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+            throw new Error('ゲーム希望に不正なゲームIDが含まれています');
+        }
+
+        const scopedIdSet = new Set(scopedIds);
+        if (preferredIds.some(id => !scopedIdSet.has(id))) {
+            throw new Error('編集対象外のゲームは選択できません');
+        }
+        if (!scopedIds.length) return { updated: 0, selected: 0 };
+
+        return database.transaction(() => {
+            const placeholders = scopedIds.map(() => '?').join(', ');
+            const validGames = database.connection().prepare(`
+                SELECT id
+                FROM games
+                WHERE guild_id = ?
+                  AND lifecycle_status = 'active'
+                  AND current_channel_id IS NOT NULL
+                  AND id IN (${placeholders})
+            `).all(guildId, ...scopedIds);
+            if (validGames.length !== scopedIds.length) {
+                throw new Error('編集対象のゲーム一覧が更新されました。もう一度開き直してください');
+            }
+
+            const preferredIdSet = new Set(preferredIds);
+            const remove = database.connection().prepare(`
+                DELETE FROM user_game_preferences
+                WHERE guild_id = ? AND user_id = ? AND game_id = ?
+            `);
+            const upsert = database.connection().prepare(`
+                INSERT INTO user_game_preferences (
+                    guild_id, user_id, game_id, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id, game_id) DO UPDATE SET
+                    updated_at = excluded.updated_at
+            `);
+            const now = nowIso();
+            for (const gameId of scopedIds) {
+                if (preferredIdSet.has(gameId)) {
+                    upsert.run(guildId, userId, gameId, now, now);
+                } else {
+                    remove.run(guildId, userId, gameId);
+                }
+            }
+            return { updated: scopedIds.length, selected: preferredIds.length };
+        })();
+    }
+
     findCurrentArchivedGame(guildId, gameId) {
         if (!database.isInitialized) return null;
         return database.connection().prepare(`
