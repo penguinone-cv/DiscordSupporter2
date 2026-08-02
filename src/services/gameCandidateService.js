@@ -18,12 +18,6 @@ class GameCandidateService {
             throw new Error('対象の稼働中ゲームが見つかりません');
         }
 
-        const members = await guild.members.fetch();
-        const activeUserIds = new Set();
-        for (const member of members.values()) {
-            if (!member.user?.bot) activeUserIds.add(member.id ?? member.user.id);
-        }
-
         // 月間画面をまだ開いていないユーザーも、登録済みの基本予定から集計する。
         // すでに月間予定がある日時枠はリポジトリ側の競合処理で上書きしない。
         availabilityRepository.materializeBasicForAllUsers(guild.id, month.id);
@@ -34,7 +28,10 @@ class GameCandidateService {
             month.id,
             game.id
         )) {
-            if (!activeUserIds.has(row.user_id)) continue;
+            // GuildMembers Intentで維持されるキャッシュを使い、集計のたびに
+            // Gateway opcode 8の全メンバー取得を送らない。
+            const member = guild.members.cache.get(row.user_id);
+            if (!member || member.user?.bot !== false) continue;
             if (!grouped.has(row.slot_id)) {
                 grouped.set(row.slot_id, {
                     slotId: row.slot_id,

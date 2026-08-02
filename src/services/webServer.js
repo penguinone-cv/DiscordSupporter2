@@ -241,15 +241,8 @@ class WebServer {
                     const role = guild.roles.cache.find(r => r.name === channelName);
                     if (!role) continue;
 
-                    // メンバーリストを取得（キャッシュを更新）
-                    try {
-                        await guild.members.fetch();
-                    } catch (e) {
-                        logger.warn(`メンバー取得エラー (${guild.name}): ${e.message}`);
-                        continue;
-                    }
-
-                    // ロールを持つメンバーを走査
+                    // GuildMembers Intentで維持されるキャッシュを使う。
+                    // チャンネル選択のたびに全メンバー取得を送らない。
                     for (const [, member] of role.members) {
                         if (member.user.bot) continue;
 

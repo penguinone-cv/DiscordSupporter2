@@ -64,11 +64,15 @@ describe('gameCandidateService', () => {
         ]);
         const guild = {
             id: 'guild-1',
-            members: { fetch: vi.fn().mockResolvedValue(members) }
+            members: {
+                cache: members,
+                fetch: vi.fn()
+            }
         };
 
         const result = await gameCandidateService.aggregate(guild, month.id, game.id);
 
+        expect(guild.members.fetch).not.toHaveBeenCalled();
         expect(result.candidates).toEqual([
             expect.objectContaining({
                 slotId: slot.id,
@@ -122,7 +126,7 @@ describe('gameCandidateService', () => {
 
         const result = await gameCandidateService.aggregate({
             id: 'guild-1',
-            members: { fetch: vi.fn().mockResolvedValue(members) }
+            members: { cache: members, fetch: vi.fn() }
         }, month.id, game.id);
 
         expect(result.candidates).toEqual(expect.arrayContaining([

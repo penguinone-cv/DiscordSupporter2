@@ -29,6 +29,15 @@ function createMockInteraction(overrides = {}) {
 }
 
 describe('interactionHandler', () => {
+    it('Discordのリクエスト制限では切り上げた待ち時間を表示する', async () => {
+        const { interactionErrorContent } = await import('../../src/handlers/interactionHandler.js');
+
+        expect(interactionErrorContent({
+            name: 'GatewayRateLimitError',
+            data: { retry_after: 4.246, opcode: 8 }
+        })).toBe('現在Discordのリクエスト制限中です。5秒後にもう一度お試しください。');
+    });
+
     it('一般ユーザー用ゲームコンポーネントを専用ハンドラーへ渡す', async () => {
         const memberHandler = vi.fn().mockResolvedValue(undefined);
         vi.doMock('../../src/interactions/gameMemberInteractionHandler.js', () => ({
