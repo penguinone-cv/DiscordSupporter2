@@ -105,7 +105,8 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
      },
      "openai": {
        "apiKey": "YOUR_OPENAI_API_KEY_HERE",
-       "model": "gpt-4o-mini"
+       "model": "gpt-5.6-luna",
+       "reasoningEffort": "none"
      },
      "features": {
        "recruitmentDetection": {

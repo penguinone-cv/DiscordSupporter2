@@ -9,6 +9,7 @@ class OpenAIService {
     constructor() {
         this.client = null;
         this.model = null;
+        this.reasoningEffort = null;
     }
 
     /**
@@ -16,13 +17,14 @@ class OpenAIService {
      */
     initialize() {
         const apiKey = config.get('openai.apiKey');
-        this.model = config.get('openai.model') || 'gpt-5-nano';
+        this.model = config.get('openai.model') || 'gpt-5.6-luna';
+        this.reasoningEffort = config.get('openai.reasoningEffort') || 'none';
 
         this.client = new OpenAI({
             apiKey: apiKey
         });
 
-        logger.info(`OpenAI初期化完了 (モデル: ${this.model})`);
+        logger.info(`OpenAI初期化完了 (モデル: ${this.model}, reasoning: ${this.reasoningEffort})`);
     }
 
     /**
@@ -36,6 +38,7 @@ class OpenAIService {
             const response = await this.client.chat.completions.create({
                 model: this.model,
                 messages: messages,
+                reasoning_effort: this.reasoningEffort,
                 max_tokens: options.maxTokens || 500,
                 ...options
             });
@@ -57,6 +60,7 @@ class OpenAIService {
             const response = await this.client.chat.completions.create({
                 model: this.model,
                 messages: messages,
+                reasoning_effort: this.reasoningEffort,
                 response_format: { type: "json_object" }
             });
 

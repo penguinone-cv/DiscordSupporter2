@@ -5,7 +5,8 @@
     },
     "openai": {
         "apiKey": "YOUR_OPENAI_API_KEY_HERE",
-        "model": "gpt-5-nano"
+        "model": "gpt-5.6-luna",
+        "reasoningEffort": "none"
     },
     "database": {
         "path": "./data/discord-supporter.db"
