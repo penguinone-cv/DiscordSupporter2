@@ -52,9 +52,15 @@ describe('gameMemberPanelService', () => {
 
     it('公開パネルに希望編集と休止中ゲームの入口を表示する', () => {
         const payload = gameMemberPanelService.buildMainPanel();
-        const buttons = payload.components[0].toJSON().components;
+        const scheduleButtons = payload.components[0].toJSON().components;
+        const gameButtons = payload.components[1].toJSON().components;
 
-        expect(buttons.map(button => button.custom_id)).toEqual([
+        expect(scheduleButtons.map(button => button.custom_id)).toEqual([
+            'schedule-user:month-open:0:0',
+            'schedule-user:basic:0',
+            'schedule-user:candidate-open:0:0'
+        ]);
+        expect(gameButtons.map(button => button.custom_id)).toEqual([
             'game-user:preferences:0',
             'game-user:archived:0'
         ]);

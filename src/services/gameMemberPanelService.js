@@ -17,11 +17,26 @@ class GameMemberPanelService {
             .setColor(0x5865F2)
             .setTitle('🎮 ゲーム案内')
             .setDescription([
+                '月間予定と普段の基本予定を登録し、ゲーム別の候補日時を確認できます。',
                 '遊びたいゲームを自分用の希望リストへ登録できます。',
                 '休止中ゲームへの復帰希望を登録できます。',
                 '操作内容と希望者の名前は他のメンバーには表示されません。'
             ].join('\n'));
-        const row = new ActionRowBuilder().addComponents(
+        const scheduleRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('schedule-user:month-open:0:0')
+                .setLabel('月間予定を編集')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('schedule-user:basic:0')
+                .setLabel('基本予定を編集')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('schedule-user:candidate-open:0:0')
+                .setLabel('候補日時を見る')
+                .setStyle(ButtonStyle.Secondary)
+        );
+        const gameRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('game-user:preferences:0')
                 .setLabel('遊びたいゲームを編集')
@@ -31,7 +46,7 @@ class GameMemberPanelService {
                 .setLabel('休止中ゲームを見る')
                 .setStyle(ButtonStyle.Secondary)
         );
-        return { embeds: [embed], components: [row] };
+        return { embeds: [embed], components: [scheduleRow, gameRow] };
     }
 
     async ensurePanel(guild) {

@@ -49,6 +49,26 @@ describe('interactionHandler', () => {
         expect(memberHandler).toHaveBeenCalledWith(interaction);
     });
 
+    it('一般ユーザー用予定表コンポーネントを専用ハンドラーへ渡す', async () => {
+        const scheduleHandler = vi.fn().mockResolvedValue(undefined);
+        vi.doMock('../../src/interactions/scheduleMemberInteractionHandler.js', () => ({
+            default: scheduleHandler,
+        }));
+        vi.resetModules();
+        const mod = await import('../../src/handlers/interactionHandler.js');
+        handleInteraction = mod.default;
+        const interaction = createMockInteraction({
+            isButton: vi.fn().mockReturnValue(true),
+            isStringSelectMenu: vi.fn().mockReturnValue(false),
+            isChatInputCommand: vi.fn().mockReturnValue(false),
+            customId: 'schedule-user:basic:0',
+        });
+
+        await handleInteraction(interaction);
+
+        expect(scheduleHandler).toHaveBeenCalledWith(interaction);
+    });
+
     it('スラッシュコマンド以外は無視する', async () => {
         const interaction = createMockInteraction({
             isChatInputCommand: vi.fn().mockReturnValue(false),

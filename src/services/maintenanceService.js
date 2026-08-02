@@ -3,6 +3,7 @@ import gameRegistryService from './gameRegistryService.js';
 import gameAdminPanelService from './gameAdminPanelService.js';
 import gameMemberPanelService from './gameMemberPanelService.js';
 import gameReturnRequestService from './gameReturnRequestService.js';
+import scheduleService from './scheduleService.js';
 import logger from '../utils/logger.js';
 
 const DAILY_INTERVAL = 24 * 60 * 60 * 1000;
@@ -28,6 +29,7 @@ class MaintenanceService {
             await gameRegistryService.reconcileAll(client);
             await channelActivityService.reconcileAll(client);
             for (const guild of client.guilds.cache.values()) {
+                scheduleService.ensureCurrentAndNext(guild.id);
                 await gameAdminPanelService.refreshPanel(guild);
                 await gameMemberPanelService.refreshPanel(guild);
                 await gameReturnRequestService.reconcileGuild(guild);

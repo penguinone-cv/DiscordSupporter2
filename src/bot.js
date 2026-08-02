@@ -20,6 +20,7 @@ import channelActivityService from './services/channelActivityService.js';
 import gameAdminPanelService from './services/gameAdminPanelService.js';
 import gameMemberPanelService from './services/gameMemberPanelService.js';
 import gameReturnRequestService from './services/gameReturnRequestService.js';
+import scheduleService from './services/scheduleService.js';
 import maintenanceService from './services/maintenanceService.js';
 import logger from './utils/logger.js';
 
@@ -96,6 +97,7 @@ class Bot {
                 channelActivityService.reconcileAll(this.client)
                     .then(async () => {
                         for (const guild of this.client.guilds.cache.values()) {
+                            scheduleService.ensureCurrentAndNext(guild.id);
                             await gameAdminPanelService.refreshPanel(guild);
                             await gameMemberPanelService.refreshPanel(guild);
                             await gameReturnRequestService.reconcileGuild(guild);
