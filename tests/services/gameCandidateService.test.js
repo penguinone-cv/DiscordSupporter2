@@ -64,6 +64,7 @@ describe('gameCandidateService', () => {
         ]);
         const guild = {
             id: 'guild-1',
+            memberCount: members.size,
             members: {
                 cache: members,
                 fetch: vi.fn()
@@ -81,6 +82,79 @@ describe('gameCandidateService', () => {
                 includingMaybeCount: 2
             })
         ]);
+    });
+
+    it('再起動直後の不完全なメンバーキャッシュを補完して全員を集計する', async () => {
+        const game = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const month = scheduleService.ensureMonth('guild-1', 2026, 8);
+        const slot = availabilityRepository.listMonthSlots('guild-1', month.id)[0];
+        for (const userId of ['user-1', 'user-2']) {
+            gameInterestRepository.replacePreferencesForGames({
+                guildId: 'guild-1',
+                userId,
+                gameIds: [game.id],
+                preferredGameIds: [game.id]
+            });
+            availabilityRepository.setUserSlotStatus({
+                guildId: 'guild-1',
+                userId,
+                slotId: slot.id,
+                status: 'available'
+            });
+        }
+
+        const cachedMembers = new Collection([
+            ['user-1', { id: 'user-1', user: { id: 'user-1', bot: false } }]
+        ]);
+        const allMembers = new Collection([
+            ...cachedMembers,
+            ['user-2', { id: 'user-2', user: { id: 'user-2', bot: false } }]
+        ]);
+        const guild = {
+            id: 'guild-1',
+            memberCount: allMembers.size,
+            members: {
+                cache: cachedMembers,
+                fetch: vi.fn().mockResolvedValue(allMembers)
+            }
+        };
+
+        const result = await gameCandidateService.aggregate(guild, month.id, game.id);
+
+        expect(guild.members.fetch).toHaveBeenCalledOnce();
+        expect(result.candidates).toEqual([
+            expect.objectContaining({
+                slotId: slot.id,
+                availableCount: 2,
+                includingMaybeCount: 2
+            })
+        ]);
+    });
+
+    it('メンバーキャッシュの補完に失敗したときは不完全な集計を返さない', async () => {
+        const game = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const month = scheduleService.ensureMonth('guild-1', 2026, 8);
+        const guild = {
+            id: 'guild-1',
+            memberCount: 2,
+            members: {
+                cache: new Collection(),
+                fetch: vi.fn().mockRejectedValue(new Error('member fetch failed'))
+            }
+        };
+
+        await expect(gameCandidateService.aggregate(guild, month.id, game.id))
+            .rejects.toThrow('member fetch failed');
     });
 
     it('休止中ゲームは候補日時を集計しない', async () => {
@@ -126,6 +200,7 @@ describe('gameCandidateService', () => {
 
         const result = await gameCandidateService.aggregate({
             id: 'guild-1',
+            memberCount: members.size,
             members: { cache: members, fetch: vi.fn() }
         }, month.id, game.id);
 
