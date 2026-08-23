@@ -7,6 +7,8 @@ import availabilityRepository from '../../src/repositories/availabilityRepositor
 import scheduleService from '../../src/services/scheduleService.js';
 import gameCandidateService from '../../src/services/gameCandidateService.js';
 
+const START_OF_AUGUST_IN_JST = new Date('2026-07-31T15:00:00.000Z');
+
 describe('gameCandidateService', () => {
     beforeEach(() => {
         database.close();
@@ -29,6 +31,7 @@ describe('gameCandidateService', () => {
         const users = [
             ['user-1', 'available'],
             ['user-2', 'maybe'],
+            ['user-3', 'unavailable'],
             ['departed-user', 'available'],
             ['bot-user', 'available']
         ];
@@ -56,6 +59,7 @@ describe('gameCandidateService', () => {
         const members = new Collection([
             ['user-1', { id: 'user-1', user: { id: 'user-1', bot: false } }],
             ['user-2', { id: 'user-2', user: { id: 'user-2', bot: false } }],
+            ['user-3', { id: 'user-3', user: { id: 'user-3', bot: false } }],
             ['bot-user', { id: 'bot-user', user: { id: 'bot-user', bot: true } }],
             ['not-interested', {
                 id: 'not-interested',
@@ -71,7 +75,12 @@ describe('gameCandidateService', () => {
             }
         };
 
-        const result = await gameCandidateService.aggregate(guild, month.id, game.id);
+        const result = await gameCandidateService.aggregate(
+            guild,
+            month.id,
+            game.id,
+            START_OF_AUGUST_IN_JST
+        );
 
         expect(guild.members.fetch).not.toHaveBeenCalled();
         expect(result.candidates).toEqual([
@@ -79,6 +88,7 @@ describe('gameCandidateService', () => {
                 slotId: slot.id,
                 availableCount: 1,
                 maybeCount: 1,
+                unavailableCount: 1,
                 includingMaybeCount: 2
             })
         ]);
@@ -124,7 +134,12 @@ describe('gameCandidateService', () => {
             }
         };
 
-        const result = await gameCandidateService.aggregate(guild, month.id, game.id);
+        const result = await gameCandidateService.aggregate(
+            guild,
+            month.id,
+            game.id,
+            START_OF_AUGUST_IN_JST
+        );
 
         expect(guild.members.fetch).toHaveBeenCalledOnce();
         expect(result.candidates).toEqual([
@@ -153,7 +168,12 @@ describe('gameCandidateService', () => {
             }
         };
 
-        await expect(gameCandidateService.aggregate(guild, month.id, game.id))
+        await expect(gameCandidateService.aggregate(
+            guild,
+            month.id,
+            game.id,
+            START_OF_AUGUST_IN_JST
+        ))
             .rejects.toThrow('member fetch failed');
     });
 
@@ -167,7 +187,12 @@ describe('gameCandidateService', () => {
         const month = scheduleService.ensureMonth('guild-1', 2026, 8);
         gameRepository.setArchived(game.id);
 
-        await expect(gameCandidateService.aggregate({ id: 'guild-1' }, month.id, game.id))
+        await expect(gameCandidateService.aggregate(
+            { id: 'guild-1' },
+            month.id,
+            game.id,
+            START_OF_AUGUST_IN_JST
+        ))
             .rejects.toThrow('対象の稼働中ゲームが見つかりません');
     });
 
@@ -202,7 +227,7 @@ describe('gameCandidateService', () => {
             id: 'guild-1',
             memberCount: members.size,
             members: { cache: members, fetch: vi.fn() }
-        }, month.id, game.id);
+        }, month.id, game.id, START_OF_AUGUST_IN_JST);
 
         expect(result.candidates).toEqual(expect.arrayContaining([
             expect.objectContaining({
@@ -211,5 +236,69 @@ describe('gameCandidateService', () => {
                 includingMaybeCount: 1
             })
         ]));
+    });
+
+    it('JSTの当日以降だけを○人数に関係なく日付順で返す', async () => {
+        const game = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const month = scheduleService.ensureMonth('guild-1', 2026, 8);
+        const slots = availabilityRepository.listMonthSlots('guild-1', month.id);
+        const pastSlot = slots.find(slot => slot.local_date === '2026-08-02');
+        const todaySlot = slots.find(slot => slot.local_date === '2026-08-03');
+        const futureSlot = slots.find(slot => slot.local_date === '2026-08-04');
+
+        for (const userId of ['user-1', 'user-2', 'user-3']) {
+            gameInterestRepository.replacePreferencesForGames({
+                guildId: 'guild-1',
+                userId,
+                gameIds: [game.id],
+                preferredGameIds: [game.id]
+            });
+        }
+        for (const [userId, slot, status] of [
+            ['user-1', pastSlot, 'available'],
+            ['user-1', todaySlot, 'available'],
+            ['user-2', todaySlot, 'maybe'],
+            ['user-3', todaySlot, 'unavailable'],
+            ['user-1', futureSlot, 'available'],
+            ['user-2', futureSlot, 'available'],
+            ['user-3', futureSlot, 'available']
+        ]) {
+            availabilityRepository.setUserSlotStatus({
+                guildId: 'guild-1',
+                userId,
+                slotId: slot.id,
+                status
+            });
+        }
+        const members = new Collection(['user-1', 'user-2', 'user-3'].map(userId => [
+            userId,
+            { id: userId, user: { id: userId, bot: false } }
+        ]));
+
+        const result = await gameCandidateService.aggregate({
+            id: 'guild-1',
+            memberCount: members.size,
+            members: { cache: members, fetch: vi.fn() }
+        }, month.id, game.id, new Date('2026-08-02T15:30:00.000Z'));
+
+        expect(result.candidates.map(candidate => candidate.localDate)).toEqual([
+            '2026-08-03',
+            '2026-08-04'
+        ]);
+        expect(result.candidates[0]).toEqual(expect.objectContaining({
+            availableCount: 1,
+            maybeCount: 1,
+            unavailableCount: 1
+        }));
+        expect(result.candidates[1]).toEqual(expect.objectContaining({
+            availableCount: 3,
+            maybeCount: 0,
+            unavailableCount: 0
+        }));
     });
 });

@@ -317,7 +317,7 @@ class AvailabilityRepository {
             JOIN games game ON game.id = preference.game_id
             WHERE answer.guild_id = ?
               AND month.id = ?
-              AND answer.status IN ('available', 'maybe')
+              AND answer.status IN ('available', 'maybe', 'unavailable')
               AND game.guild_id = ?
               AND game.lifecycle_status = 'active'
               AND game.current_channel_id IS NOT NULL

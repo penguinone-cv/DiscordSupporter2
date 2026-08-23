@@ -1,6 +1,7 @@
 import gameRepository from '../repositories/gameRepository.js';
 import availabilityRepository from '../repositories/availabilityRepository.js';
 import scheduleService from './scheduleService.js';
+import { currentDateKey } from '../utils/scheduleDate.js';
 
 class GameCandidateService {
     constructor() {
@@ -32,7 +33,7 @@ class GameCandidateService {
         return pending;
     }
 
-    async aggregate(guild, monthId, gameId) {
+    async aggregate(guild, monthId, gameId, now = new Date()) {
         const month = scheduleService.getMonth(guild.id, monthId);
         const game = gameRepository.findById(gameId);
         if (!game
@@ -46,6 +47,7 @@ class GameCandidateService {
         // すでに月間予定がある日時枠はリポジトリ側の競合処理で上書きしない。
         availabilityRepository.materializeBasicForAllUsers(guild.id, month.id);
         const members = await this.currentMembers(guild);
+        const todayInJst = currentDateKey(now, 'Asia/Tokyo');
 
         const grouped = new Map();
         for (const row of availabilityRepository.listCandidateResponses(
@@ -53,6 +55,7 @@ class GameCandidateService {
             month.id,
             game.id
         )) {
+            if (row.local_date < todayInJst) continue;
             const member = members.get(row.user_id);
             if (!member || member.user?.bot !== false) continue;
             if (!grouped.has(row.slot_id)) {
@@ -65,21 +68,21 @@ class GameCandidateService {
                     sortOrder: row.sort_order,
                     availableCount: 0,
                     maybeCount: 0,
+                    unavailableCount: 0,
                     includingMaybeCount: 0
                 });
             }
             const aggregate = grouped.get(row.slot_id);
             if (row.status === 'available') aggregate.availableCount += 1;
             if (row.status === 'maybe') aggregate.maybeCount += 1;
+            if (row.status === 'unavailable') aggregate.unavailableCount += 1;
             aggregate.includingMaybeCount = aggregate.availableCount + aggregate.maybeCount;
         }
 
         const candidates = [...grouped.values()]
             .filter(candidate => candidate.includingMaybeCount > 0)
             .sort((left, right) => (
-                right.availableCount - left.availableCount
-                || right.includingMaybeCount - left.includingMaybeCount
-                || left.localDate.localeCompare(right.localDate)
+                left.localDate.localeCompare(right.localDate)
                 || left.sortOrder - right.sortOrder
                 || left.slotId - right.slotId
             ));

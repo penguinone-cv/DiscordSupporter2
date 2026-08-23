@@ -253,7 +253,7 @@ class SchedulePanelService {
         const topCandidates = result.candidates.slice(0, 10);
         const lines = topCandidates.map((candidate, index) => [
             `**${index + 1}. ${formatDateLabel(candidate.localDate)} ${formatMinutes(candidate.startMinutes)}**`,
-            `○ ${candidate.availableCount}人 / △込み${candidate.includingMaybeCount}人`
+            `○ ${candidate.availableCount}人 / △ ${candidate.maybeCount}人 / × ${candidate.unavailableCount}人`
         ].join('\n'));
         const embed = new EmbedBuilder()
             .setColor(0x57F287)
