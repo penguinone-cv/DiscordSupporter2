@@ -6,7 +6,7 @@ import roleManager from './services/roleManager.js';
 import reminderService from './services/reminderService.js';
 import webServer from './services/webServer.js';
 import handleMessage from './handlers/messageHandler.js';
-import handleReactionAdd from './handlers/reactionHandler.js';
+import handleReactionAdd, { handleReactionRemove } from './handlers/reactionHandler.js';
 import handleInteraction from './handlers/interactionHandler.js';
 import handleChannelCreate from './handlers/channelCreateHandler.js';
 import handleChannelUpdate from './handlers/channelUpdateHandler.js';
@@ -115,6 +115,7 @@ class Bot {
 
         // リアクション追加
         this.client.on('messageReactionAdd', handleReactionAdd);
+        this.client.on('messageReactionRemove', handleReactionRemove);
 
         // チャンネル作成
         this.client.on('channelCreate', handleChannelCreate);

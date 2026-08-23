@@ -23,7 +23,8 @@ describe('ゲーム管理DB', () => {
             '001_game_registry.sql',
             '002_soft_archive.sql',
             '003_game_interests.sql',
-            '004_availability_schedule.sql'
+            '004_availability_schedule.sql',
+            '005_game_recruitments.sql'
         ]);
     });
 

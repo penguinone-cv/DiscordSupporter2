@@ -1,5 +1,6 @@
 import { MessageFlags } from 'discord.js';
 import gameMemberPanelService from '../services/gameMemberPanelService.js';
+import gameRecruitmentService from '../services/gameRecruitmentService.js';
 import scheduleService from '../services/scheduleService.js';
 import schedulePanelService from '../services/schedulePanelService.js';
 
@@ -153,7 +154,58 @@ export default async function handleScheduleMemberInteraction(interaction) {
             Number(interaction.values[0]),
             Number(pageString) || 0
         );
-        return interaction.editReply(payload);
+        return interaction.editReply({ ...payload, content: null });
+    }
+
+    if (action === 'candidate-slot-select') {
+        const [monthIdString, gameIdString, pageString = '0'] = args;
+        await interaction.deferUpdate();
+        const payload = await schedulePanelService.buildCandidateResults(
+            interaction.guild,
+            Number(monthIdString),
+            Number(gameIdString),
+            Number(pageString) || 0,
+            Number(interaction.values[0])
+        );
+        return interaction.editReply({ ...payload, content: null });
+    }
+
+    if (action === 'candidate-recruit') {
+        const [monthIdString, gameIdString, pageString = '0', slotIdString] = args;
+        const monthId = Number(monthIdString);
+        const gameId = Number(gameIdString);
+        const gamePage = Number(pageString) || 0;
+        const slotId = Number(slotIdString);
+        if (!Number.isSafeInteger(slotId) || slotId <= 0) {
+            throw new Error('募集する候補日時を選択してください');
+        }
+
+        await interaction.deferUpdate();
+        try {
+            await gameRecruitmentService.createRecruitment({
+                guild: interaction.guild,
+                monthId,
+                gameId,
+                slotId,
+                userId
+            });
+        } catch (error) {
+            if (error?.name === 'GameRecruitmentError') {
+                return interaction.editReply({ content: `❌ ${error.message}` });
+            }
+            throw error;
+        }
+        const payload = await schedulePanelService.buildCandidateResults(
+            interaction.guild,
+            monthId,
+            gameId,
+            gamePage,
+            slotId
+        );
+        return interaction.editReply({
+            ...payload,
+            content: '✅ ゲームチャンネルへ募集メッセージを送信しました。'
+        });
     }
 
     throw new Error('未対応の予定表操作です');
