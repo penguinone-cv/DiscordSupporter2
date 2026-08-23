@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import database from '../../src/repositories/database.js';
 import scheduleService from '../../src/services/scheduleService.js';
 import schedulePanelService from '../../src/services/schedulePanelService.js';
+import gameCandidateService from '../../src/services/gameCandidateService.js';
 
 function customIds(payload) {
     return payload.components.flatMap(row =>
@@ -54,5 +55,25 @@ describe('schedulePanelService', () => {
             .toBe(true);
         expect(new Set(customIds(weekPayload)).size).toBe(customIds(weekPayload).length);
         expect(new Set(customIds(dayPayload)).size).toBe(customIds(dayPayload).length);
+    });
+
+    it('候補日時に○、△、×の人数を個別表示する', async () => {
+        vi.spyOn(gameCandidateService, 'aggregate').mockResolvedValue({
+            month: { id: 1, guild_id: guild.id, year: 2026, month: 8 },
+            game: { display_name: 'apex' },
+            candidates: [{
+                localDate: '2026-08-03',
+                startMinutes: 21 * 60,
+                availableCount: 1,
+                maybeCount: 2,
+                unavailableCount: 3
+            }]
+        });
+
+        const payload = await schedulePanelService.buildCandidateResults(guild, 1, 1);
+        const description = payload.embeds[0].toJSON().description;
+
+        expect(description).toContain('○ 1人 / △ 2人 / × 3人');
+        expect(description).not.toContain('△込み');
     });
 });

@@ -74,6 +74,17 @@ export function currentYearMonth(now = new Date(), timezone = 'Asia/Tokyo') {
     return { year: value('year'), month: value('month') };
 }
 
+export function currentDateKey(now = new Date(), timezone = 'Asia/Tokyo') {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+    }).formatToParts(now);
+    const value = type => Number(parts.find(part => part.type === type)?.value);
+    return toDateKey(value('year'), value('month'), value('day'));
+}
+
 export function shiftYearMonth(year, month, offset) {
     const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
     return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
