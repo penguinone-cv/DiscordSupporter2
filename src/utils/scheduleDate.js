@@ -101,3 +101,74 @@ export function formatDateLabel(dateKey, { includeYear = false } = {}) {
     const weekday = SHORT_WEEKDAY_LABELS[weekdayForDate(dateKey)];
     return `${includeYear ? `${year}年` : ''}${month}月${day}日（${weekday}）`;
 }
+
+/**
+ * IANAタイムゾーン上のローカル日付・時刻を、同じ瞬間を表すDateへ変換する。
+ * 候補日時とリマインド時刻をサーバーの予定タイムゾーンどおりに扱うために使う。
+ */
+export function dateAtMinutesInTimeZone(dateKey, minutes, timeZone = 'Asia/Tokyo') {
+    const { year, month, day } = parseDateKey(dateKey);
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1439) {
+        throw new Error('不正な時刻です');
+    }
+
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    const targetAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    });
+
+    const localParts = timestamp => {
+        const values = Object.fromEntries(
+            formatter.formatToParts(new Date(timestamp))
+                .filter(part => part.type !== 'literal')
+                .map(part => [part.type, Number(part.value)])
+        );
+        return {
+            year: values.year,
+            month: values.month,
+            day: values.day,
+            hour: values.hour,
+            minute: values.minute,
+            second: values.second
+        };
+    };
+
+    // UTCを仮定した値からタイムゾーンのオフセットを反復補正する。
+    let timestamp = targetAsUtc;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+        const parts = localParts(timestamp);
+        const representedAsUtc = Date.UTC(
+            parts.year,
+            parts.month - 1,
+            parts.day,
+            parts.hour,
+            parts.minute,
+            parts.second
+        );
+        const adjusted = targetAsUtc - (representedAsUtc - timestamp);
+        if (adjusted === timestamp) break;
+        timestamp = adjusted;
+    }
+
+    const actual = localParts(timestamp);
+    if (
+        actual.year !== year
+        || actual.month !== month
+        || actual.day !== day
+        || actual.hour !== hour
+        || actual.minute !== minute
+        || actual.second !== 0
+    ) {
+        throw new Error('指定タイムゾーンに存在しない日時です');
+    }
+    return new Date(timestamp);
+}

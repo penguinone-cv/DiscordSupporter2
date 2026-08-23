@@ -13,11 +13,20 @@ vi.mock('../../src/services/roleManager.js', () => ({
     default: { assignRoleByChannel: vi.fn() },
 }));
 
-import handleReactionAdd from '../../src/handlers/reactionHandler.js';
+vi.mock('../../src/services/gameRecruitmentService.js', () => ({
+    default: { handleReactionChange: vi.fn() },
+}));
+
+import handleReactionAdd, { handleReactionRemove } from '../../src/handlers/reactionHandler.js';
 import config from '../../src/config/configLoader.js';
 import roleManager from '../../src/services/roleManager.js';
+import gameRecruitmentService from '../../src/services/gameRecruitmentService.js';
 
 describe('reactionHandler', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('Bot のリアクションは無視する', async () => {
         const reaction = { partial: false, message: {} };
         const user = { bot: true, id: 'bot-id' };
@@ -25,9 +34,10 @@ describe('reactionHandler', () => {
         await handleReactionAdd(reaction, user);
 
         expect(roleManager.assignRoleByChannel).not.toHaveBeenCalled();
+        expect(gameRecruitmentService.handleReactionChange).not.toHaveBeenCalled();
     });
 
-    it('autoRole 機能が無効なら処理をスキップする', async () => {
+    it('autoRole 機能が無効でも募集リアクションは処理する', async () => {
         const reaction = { partial: false, message: {} };
         const user = { bot: false, id: 'user-1' };
         config.get.mockReturnValue(false);
@@ -35,6 +45,8 @@ describe('reactionHandler', () => {
         await handleReactionAdd(reaction, user);
 
         expect(roleManager.assignRoleByChannel).not.toHaveBeenCalled();
+        expect(gameRecruitmentService.handleReactionChange)
+            .toHaveBeenCalledWith(reaction, user, { removed: false });
     });
 
     it('パーシャルの場合はフェッチしてからロール付与する', async () => {
@@ -93,5 +105,16 @@ describe('reactionHandler', () => {
         await handleReactionAdd(reaction, user);
 
         expect(roleManager.assignRoleByChannel).toHaveBeenCalledWith(mockMember, reaction.message.channel);
+    });
+
+    it('リアクション削除を募集の参加者更新へ渡す', async () => {
+        const reaction = { partial: false, message: { id: 'message-1' } };
+        const user = { bot: false, id: 'user-1' };
+
+        await handleReactionRemove(reaction, user);
+
+        expect(gameRecruitmentService.handleReactionChange)
+            .toHaveBeenCalledWith(reaction, user, { removed: true });
+        expect(roleManager.assignRoleByChannel).not.toHaveBeenCalled();
     });
 });
