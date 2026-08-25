@@ -17,11 +17,11 @@ class GameMemberPanelService {
             .setColor(0x5865F2)
             .setTitle('🎮 ゲーム案内')
             .setDescription([
-                '月間予定と普段の基本予定を登録し、ゲーム別の候補日時を確認できます。',
+                '月間予定と普段の基本予定を登録し、ゲーム別の候補日程を確認できます。',
                 '遊びたいゲームを自分用の希望リストへ登録できます。',
                 '休止中ゲームへの復帰希望を登録できます。',
                 '予定とゲーム希望の編集内容は他のメンバーには表示されません。',
-                '候補日時から募集を送信した後は、参加・不参加リアクションの一覧がゲームチャンネルに表示されます。'
+                '候補日程から募集を送信した後は、参加・不参加リアクションの一覧がゲームチャンネルに表示されます。'
             ].join('\n'));
         const scheduleRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -34,7 +34,7 @@ class GameMemberPanelService {
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId('schedule-user:candidate-open:0:0')
-                .setLabel('候補日時を見る')
+                .setLabel('候補日程を見る')
                 .setStyle(ButtonStyle.Secondary)
         );
         const gameRow = new ActionRowBuilder().addComponents(

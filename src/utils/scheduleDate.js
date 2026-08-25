@@ -104,7 +104,7 @@ export function formatDateLabel(dateKey, { includeYear = false } = {}) {
 
 /**
  * IANAタイムゾーン上のローカル日付・時刻を、同じ瞬間を表すDateへ変換する。
- * 候補日時とリマインド時刻をサーバーの予定タイムゾーンどおりに扱うために使う。
+ * リマインド時刻をサーバーの予定タイムゾーンどおりに扱うために使う。
  */
 export function dateAtMinutesInTimeZone(dateKey, minutes, timeZone = 'Asia/Tokyo') {
     const { year, month, day } = parseDateKey(dateKey);

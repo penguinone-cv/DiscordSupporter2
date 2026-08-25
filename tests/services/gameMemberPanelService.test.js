@@ -54,6 +54,10 @@ describe('gameMemberPanelService', () => {
         const payload = gameMemberPanelService.buildMainPanel();
         const scheduleButtons = payload.components[0].toJSON().components;
         const gameButtons = payload.components[1].toJSON().components;
+        const payloadText = JSON.stringify({
+            embeds: payload.embeds.map(embed => embed.toJSON()),
+            components: payload.components.map(row => row.toJSON())
+        });
 
         expect(scheduleButtons.map(button => button.custom_id)).toEqual([
             'schedule-user:month-open:0:0',
@@ -64,6 +68,8 @@ describe('gameMemberPanelService', () => {
             'game-user:preferences:0',
             'game-user:archived:0'
         ]);
+        expect(payloadText).toContain('候補日程');
+        expect(payloadText).not.toContain('候補日時');
     });
 
     it('稼働中ゲームを複数選択でき、現在の希望を初期選択へ反映する', () => {

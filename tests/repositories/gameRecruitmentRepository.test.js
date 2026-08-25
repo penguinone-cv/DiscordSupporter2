@@ -131,7 +131,7 @@ describe('gameRecruitmentRepository', () => {
         expect(gameRecruitmentRepository.findById(pending.id)).toBeNull();
     });
 
-    it('同じゲームと候補日時の重複を専用エラーで通知する', () => {
+    it('同じゲームと候補日程の重複を専用エラーで通知する', () => {
         const game = createGame();
         const slot = createSlot();
         reserve(game, slot);
@@ -145,6 +145,8 @@ describe('gameRecruitmentRepository', () => {
 
         expect(conflict).toBeInstanceOf(RecruitmentConflictError);
         expect(conflict.code).toBe(RecruitmentConflictCode.GAME_SLOT_ALREADY_RESERVED);
+        expect(conflict.message)
+            .toBe('このゲームと候補日程の募集はすでに作成されています');
     });
 
     it('同じDiscordメッセージの紐付けを専用エラーで通知する', () => {

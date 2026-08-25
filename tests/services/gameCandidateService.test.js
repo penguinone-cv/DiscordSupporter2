@@ -177,7 +177,7 @@ describe('gameCandidateService', () => {
             .rejects.toThrow('member fetch failed');
     });
 
-    it('休止中ゲームは候補日時を集計しない', async () => {
+    it('休止中ゲームは候補日程を集計しない', async () => {
         const game = gameRepository.registerChannel({
             guildId: 'guild-1',
             channelId: 'channel-1',
@@ -300,5 +300,92 @@ describe('gameCandidateService', () => {
             maybeCount: 0,
             unavailableCount: 0
         }));
+    });
+
+    it('月間予定のタイムゾーンで当日を含み前日を除外する', async () => {
+        const game = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const month = scheduleService.ensureMonth('guild-1', 2026, 8);
+        database.connection().prepare(`
+            UPDATE availability_months SET timezone = ? WHERE id = ?
+        `).run('America/New_York', month.id);
+        const slots = availabilityRepository.listMonthSlots('guild-1', month.id);
+        const previousDaySlot = slots.find(slot => slot.local_date === '2026-08-01');
+        const todaySlot = slots.find(slot => slot.local_date === '2026-08-02');
+        const nextDaySlot = slots.find(slot => slot.local_date === '2026-08-03');
+
+        gameInterestRepository.replacePreferencesForGames({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            gameIds: [game.id],
+            preferredGameIds: [game.id]
+        });
+        for (const slot of [previousDaySlot, todaySlot, nextDaySlot]) {
+            availabilityRepository.setUserSlotStatus({
+                guildId: 'guild-1',
+                userId: 'user-1',
+                slotId: slot.id,
+                status: 'available'
+            });
+        }
+        const members = new Collection([
+            ['user-1', { id: 'user-1', user: { id: 'user-1', bot: false } }]
+        ]);
+
+        // UTC/JSTでは8月3日だが、月間予定のAmerica/New_Yorkでは8月2日。
+        const result = await gameCandidateService.aggregate({
+            id: 'guild-1',
+            memberCount: members.size,
+            members: { cache: members, fetch: vi.fn() }
+        }, month.id, game.id, new Date('2026-08-03T02:00:00.000Z'));
+
+        expect(result.month.timezone).toBe('America/New_York');
+        expect(result.candidates.map(candidate => candidate.localDate)).toEqual([
+            '2026-08-02',
+            '2026-08-03'
+        ]);
+    });
+
+    it('同日の休日候補を昼、夜の順で返す', async () => {
+        const game = gameRepository.registerChannel({
+            guildId: 'guild-1',
+            channelId: 'channel-1',
+            channelName: 'apex',
+            parentCategoryId: 'category-1'
+        });
+        const month = scheduleService.ensureMonth('guild-1', 2026, 8);
+        const restDaySlots = availabilityRepository.listMonthSlots('guild-1', month.id)
+            .filter(slot => slot.local_date === '2026-08-02');
+        gameInterestRepository.replacePreferencesForGames({
+            guildId: 'guild-1',
+            userId: 'user-1',
+            gameIds: [game.id],
+            preferredGameIds: [game.id]
+        });
+        for (const slot of restDaySlots) {
+            availabilityRepository.setUserSlotStatus({
+                guildId: 'guild-1',
+                userId: 'user-1',
+                slotId: slot.id,
+                status: 'available'
+            });
+        }
+        const members = new Collection([
+            ['user-1', { id: 'user-1', user: { id: 'user-1', bot: false } }]
+        ]);
+
+        const result = await gameCandidateService.aggregate({
+            id: 'guild-1',
+            memberCount: members.size,
+            members: { cache: members, fetch: vi.fn() }
+        }, month.id, game.id, START_OF_AUGUST_IN_JST);
+
+        expect(result.candidates
+            .filter(candidate => candidate.localDate === '2026-08-02')
+            .map(candidate => candidate.label)).toEqual(['昼', '夜']);
     });
 });

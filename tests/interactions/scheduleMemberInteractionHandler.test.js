@@ -81,7 +81,7 @@ describe('scheduleMemberInteractionHandler', () => {
         expect(target.update).toHaveBeenCalledWith({ content: 'basic' });
     });
 
-    it('候補日時集計中は先に応答を保留してから結果を表示する', async () => {
+    it('候補日程集計中は先に応答を保留してから結果を表示する', async () => {
         const target = interaction({
             customId: 'schedule-user:candidate-select:3:1',
             values: ['42']
@@ -94,7 +94,7 @@ describe('scheduleMemberInteractionHandler', () => {
         expect(target.editReply).toHaveBeenCalledWith({ content: null });
     });
 
-    it('候補日時を選ぶと同じ画面を選択済み状態へ更新する', async () => {
+    it('候補日程を選ぶと同じ画面を選択済み状態へ更新する', async () => {
         const target = interaction({
             customId: 'schedule-user:candidate-slot-select:3:42:1',
             values: ['99']
@@ -128,11 +128,22 @@ describe('scheduleMemberInteractionHandler', () => {
         });
     });
 
+    it('候補日程が未選択なら募集を作成しない', async () => {
+        const target = interaction({
+            customId: 'schedule-user:candidate-recruit:3:42:1:none'
+        });
+
+        await expect(handleScheduleMemberInteraction(target))
+            .rejects.toThrow('募集する候補日程を選択してください');
+
+        expect(createRecruitment).not.toHaveBeenCalled();
+    });
+
     it('重複など利用者が修正できる募集エラーを本人へ表示する', async () => {
         const target = interaction({
             customId: 'schedule-user:candidate-recruit:3:42:1:99'
         });
-        const error = new Error('このゲームと候補日時の募集はすでに作成されています');
+        const error = new Error('このゲームと候補日程の募集はすでに作成されています');
         error.name = 'GameRecruitmentError';
         createRecruitment.mockRejectedValueOnce(error);
 

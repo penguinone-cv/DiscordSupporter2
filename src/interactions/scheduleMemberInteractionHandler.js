@@ -177,7 +177,7 @@ export default async function handleScheduleMemberInteraction(interaction) {
         const gamePage = Number(pageString) || 0;
         const slotId = Number(slotIdString);
         if (!Number.isSafeInteger(slotId) || slotId <= 0) {
-            throw new Error('募集する候補日時を選択してください');
+            throw new Error('募集する候補日程を選択してください');
         }
 
         await interaction.deferUpdate();
