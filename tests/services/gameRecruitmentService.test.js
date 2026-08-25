@@ -86,6 +86,13 @@ function embedJson(payload) {
     return payload.embeds[0].toJSON();
 }
 
+function expectDateOnlySchedule(embed, dateLabel, slotLabel) {
+    expect(embed.description).toContain(`**開催日:** ${dateLabel}`);
+    expect(embed.description).toContain(`**時間枠:** ${slotLabel}`);
+    expect(embed.description).not.toMatch(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/);
+    expect(embed.description).not.toContain('<t:');
+}
+
 describe('gameRecruitmentService', () => {
     let game;
     let month;
@@ -222,7 +229,7 @@ describe('gameRecruitmentService', () => {
         reminderService.createReminder.mockResolvedValue({ id: 'reminder-1' });
     });
 
-    it('候補日時を予約し、ロールメンション付き募集と3種類の初期リアクションを作成する', async () => {
+    it('候補日程を予約し、ロールメンション付き募集と3種類の初期リアクションを作成する', async () => {
         const result = await gameRecruitmentService.createRecruitment({
             guild,
             monthId: month.id,
@@ -245,6 +252,7 @@ describe('gameRecruitmentService', () => {
             allowedMentions: { parse: [], roles: [ROLE_ID], users: [] }
         }));
         const initialEmbed = embedJson(channel.send.mock.calls[0][0]);
+        expectDateOnlySchedule(initialEmbed, '2026年8月24日（月）', '夜');
         expect(initialEmbed.fields).toEqual(expect.arrayContaining([
             expect.objectContaining({ name: '状態', value: '🟢 募集中' }),
             expect.objectContaining({ name: `${ATTENDING_EMOJI} 参加者 (0人)`, value: 'なし' }),
@@ -293,13 +301,27 @@ describe('gameRecruitmentService', () => {
         ]);
     });
 
+    it('固定開始時刻を過ぎても月間予定タイムゾーンの当日候補を募集できる', async () => {
+        vi.setSystemTime(new Date('2026-08-24T13:30:00.000Z'));
+
+        await expect(gameRecruitmentService.createRecruitment({
+            guild,
+            monthId: month.id,
+            gameId: game.id,
+            slotId: slot.id,
+            userId: 'creator-1'
+        })).resolves.toEqual({ recruitment: openRecruitment, message });
+
+        expect(channel.send).toHaveBeenCalledOnce();
+    });
+
     it.each([
         ['候補にない日時', () => {
             gameCandidateService.aggregate.mockResolvedValue({ game, month, candidates: [] });
-        }, '対象の候補日時が見つかりません'],
-        ['過去の日時', () => {
+        }, '対象の候補日程が見つかりません'],
+        ['前日の候補', () => {
             candidate.localDate = '2026-08-22';
-        }, '過去の候補日時では募集できません'],
+        }, '過去の候補日程では募集できません'],
         ['送信できないチャンネル', () => {
             channel.isSendable = () => false;
         }, 'ゲームチャンネルへメッセージを送信できません'],
@@ -342,7 +364,7 @@ describe('gameRecruitmentService', () => {
             gameId: game.id,
             slotId: candidates[10].slotId,
             userId: 'creator-1'
-        })).rejects.toThrow('募集できる候補日時は上位10件までです');
+        })).rejects.toThrow('募集できる候補日程は上位10件までです');
 
         expect(gameRecruitmentRepository.reserve).not.toHaveBeenCalled();
     });
@@ -363,7 +385,7 @@ describe('gameRecruitmentService', () => {
     });
 
     it('同じ候補の重複は利用者向け募集エラーへ変換する', async () => {
-        const conflict = new Error('このゲームと候補日時の募集はすでに作成されています');
+        const conflict = new Error('このゲームと候補日程の募集はすでに作成されています');
         conflict.name = 'RecruitmentConflictError';
         gameRecruitmentRepository.reserve.mockImplementationOnce(() => {
             throw conflict;
@@ -417,7 +439,9 @@ describe('gameRecruitmentService', () => {
         expect(updated.allowedMentions).toEqual({
             parse: [], roles: [], users: [], repliedUser: false
         });
-        expect(embedJson(updated).fields).toEqual(expect.arrayContaining([
+        const updatedEmbed = embedJson(updated);
+        expectDateOnlySchedule(updatedEmbed, '2026年8月24日（月）', '夜');
+        expect(updatedEmbed.fields).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 name: `${ATTENDING_EMOJI} 参加者 (1人)`,
                 value: '<@participant-1>'
@@ -473,14 +497,20 @@ describe('gameRecruitmentService', () => {
             participant.id
         );
         expect(reminderService.extractDate).not.toHaveBeenCalled();
-        expect(reminderService.createReminder).toHaveBeenCalledWith({
+        expect(reminderService.createReminder).toHaveBeenCalledWith(expect.objectContaining({
             guildId: GUILD_ID,
             channelId: CHANNEL_ID,
             messageId: MESSAGE_ID,
-            originalContent: expect.stringContaining('Apex Legends'),
             remindAt: '2026-08-24T03:00:00.000Z',
             userId: participant.id
-        });
+        }));
+        const reminderPayload = reminderService.createReminder.mock.calls[0][0];
+        expect(reminderPayload.originalContent).toContain('Apex Legends');
+        expect(reminderPayload.originalContent).toContain('2026年8月24日（月）');
+        expect(reminderPayload.originalContent).toContain('夜');
+        expect(reminderPayload.originalContent)
+            .not.toMatch(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/);
+        expect(reminderPayload.remindAt).toBe('2026-08-24T03:00:00.000Z');
         expect(reminderService.createReminder).toHaveBeenCalledOnce();
         expect(gameRecruitmentRepository.setReminderId).toHaveBeenCalledWith(
             confirmedRecruitment.id,

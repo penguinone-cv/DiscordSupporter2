@@ -47,7 +47,7 @@ class GameCandidateService {
         // すでに月間予定がある日時枠はリポジトリ側の競合処理で上書きしない。
         availabilityRepository.materializeBasicForAllUsers(guild.id, month.id);
         const members = await this.currentMembers(guild);
-        const todayInJst = currentDateKey(now, 'Asia/Tokyo');
+        const today = currentDateKey(now, month.timezone);
 
         const grouped = new Map();
         for (const row of availabilityRepository.listCandidateResponses(
@@ -55,7 +55,7 @@ class GameCandidateService {
             month.id,
             game.id
         )) {
-            if (row.local_date < todayInJst) continue;
+            if (row.local_date < today) continue;
             const member = members.get(row.user_id);
             if (!member || member.user?.bot !== false) continue;
             if (!grouped.has(row.slot_id)) {

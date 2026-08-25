@@ -25,7 +25,7 @@ function throwMappedConflict(error) {
         && detail.includes('game_recruitments.slot_id')) {
         throw new RecruitmentConflictError(
             RecruitmentConflictCode.GAME_SLOT_ALREADY_RESERVED,
-            'このゲームと候補日時の募集はすでに作成されています',
+            'このゲームと候補日程の募集はすでに作成されています',
             { cause: error }
         );
     }

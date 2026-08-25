@@ -2,7 +2,11 @@ import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import availabilityRepository from '../repositories/availabilityRepository.js';
 import gameRecruitmentRepository from '../repositories/gameRecruitmentRepository.js';
 import gameRepository from '../repositories/gameRepository.js';
-import { dateAtMinutesInTimeZone, formatDateLabel, formatMinutes } from '../utils/scheduleDate.js';
+import {
+    currentDateKey,
+    dateAtMinutesInTimeZone,
+    formatDateLabel
+} from '../utils/scheduleDate.js';
 import logger from '../utils/logger.js';
 import gameCandidateService from './gameCandidateService.js';
 import reminderService from './reminderService.js';
@@ -70,11 +74,7 @@ function isSendable(channel) {
 }
 
 function slotSummary(slot) {
-    const start = formatMinutes(slot.start_minutes);
-    const end = slot.end_minutes === null || slot.end_minutes === undefined
-        ? ''
-        : `～${formatMinutes(slot.end_minutes)}`;
-    return `${formatDateLabel(slot.local_date, { includeYear: true })} ${start}${end} (${slot.label})`;
+    return `${formatDateLabel(slot.local_date, { includeYear: true })} (${slot.label})`;
 }
 
 function mentionList(ids) {
@@ -102,19 +102,12 @@ class GameRecruitmentService {
         this.attendanceSequence = 0;
     }
 
-    buildEmbed({ game, slot, month, status = 'open', attendingIds = [], decliningIds = [] }) {
-        const startsAt = dateAtMinutesInTimeZone(
-            slot.local_date,
-            slot.start_minutes,
-            month.timezone
-        );
-        const unixTime = Math.floor(startsAt.getTime() / 1000);
-
+    buildEmbed({ game, slot, status = 'open', attendingIds = [], decliningIds = [] }) {
         return new EmbedBuilder()
             .setColor(status === 'confirmed' ? 0x57F287 : 0x5865F2)
             .setTitle(`🎮 ${game.display_name} 参加募集`)
             .setDescription([
-                `**開催日時:** <t:${unixTime}:F>`,
+                `**開催日:** ${formatDateLabel(slot.local_date, { includeYear: true })}`,
                 `**時間枠:** ${slot.label}`,
                 '',
                 `${ATTENDING_EMOJI} 参加表明 / ${DECLINING_EMOJI} 参加不可 / :${CONFIRMATION_EMOJI_NAME}: 開催確定`
@@ -171,25 +164,17 @@ class GameRecruitmentService {
             rejectRecruitment('対象の月間予定が見つかりません');
         }
         const slot = aggregated.candidates.find(candidate => String(candidate.slotId) === String(slotId));
-        if (!slot) rejectRecruitment('対象の候補日時が見つかりません');
+        if (!slot) rejectRecruitment('対象の候補日程が見つかりません');
 
-        const startsAt = dateAtMinutesInTimeZone(
-            slot.localDate,
-            slot.startMinutes,
-            month.timezone
-        );
-        if (startsAt.getTime() <= Date.now()) {
-            rejectRecruitment('過去の候補日時では募集できません');
+        const today = currentDateKey(new Date(), month.timezone);
+        if (slot.localDate < today) {
+            rejectRecruitment('過去の候補日程では募集できません');
         }
-        const topFutureCandidates = aggregated.candidates
-            .filter(candidate => dateAtMinutesInTimeZone(
-                candidate.localDate,
-                candidate.startMinutes,
-                month.timezone
-            ).getTime() > Date.now())
+        const topEligibleCandidates = aggregated.candidates
+            .filter(candidate => candidate.localDate >= today)
             .slice(0, 10);
-        if (!topFutureCandidates.some(candidate => String(candidate.slotId) === String(slotId))) {
-            rejectRecruitment('募集できる候補日時は上位10件までです');
+        if (!topEligibleCandidates.some(candidate => String(candidate.slotId) === String(slotId))) {
+            rejectRecruitment('募集できる候補日程は上位10件までです');
         }
 
         const channel = await fetchManagerEntry(guild.channels, game.current_channel_id);
@@ -218,7 +203,6 @@ class GameRecruitmentService {
                 content: `<@&${role.id}>`,
                 embeds: [this.buildEmbed({
                     game,
-                    month,
                     slot: {
                         local_date: slot.localDate,
                         label: slot.label,
@@ -304,7 +288,7 @@ class GameRecruitmentService {
         const month = slot
             ? availabilityRepository.findMonthById(recruitment.guild_id, slot.month_id)
             : null;
-        if (!game || !slot || !month) throw new Error('募集の候補日時を取得できません');
+        if (!game || !slot || !month) throw new Error('募集の候補日程を取得できません');
         return { game, slot, month };
     }
 
@@ -340,7 +324,6 @@ class GameRecruitmentService {
             embeds: [this.buildEmbed({
                 game,
                 slot,
-                month,
                 status: recruitment.status,
                 attendingIds: humanUserIds(responses.attendingUsers),
                 decliningIds: humanUserIds(responses.decliningUsers)

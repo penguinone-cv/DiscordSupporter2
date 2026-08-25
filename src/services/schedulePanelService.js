@@ -9,9 +9,8 @@ import scheduleService from './scheduleService.js';
 import gameCandidateService from './gameCandidateService.js';
 import {
     DAY_RULE_LABELS,
-    dateAtMinutesInTimeZone,
-    formatDateLabel,
-    formatMinutes
+    currentDateKey,
+    formatDateLabel
 } from '../utils/scheduleDate.js';
 
 const GAME_PAGE_SIZE = 25;
@@ -33,11 +32,7 @@ function monthTitle(month) {
 }
 
 export function isFutureCandidate(candidate, timezone, now = new Date()) {
-    return dateAtMinutesInTimeZone(
-        candidate.localDate,
-        candidate.startMinutes,
-        timezone
-    ).getTime() > now.getTime();
+    return candidate.localDate >= currentDateKey(now, timezone);
 }
 
 function buttonRows(buttons) {
@@ -53,7 +48,7 @@ class SchedulePanelService {
         const day = scheduleService.getBasicDay(guild.id, userId, requestedPage);
         const lines = day.templates.map(template => {
             const meta = statusMeta(template.status);
-            return `${template.label} ${formatMinutes(template.start_minutes)}以降：**${meta.symbol} ${meta.label}**`;
+            return `${template.label}：**${meta.symbol} ${meta.label}**`;
         });
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
@@ -158,7 +153,7 @@ class SchedulePanelService {
             const source = slot.source === 'basic'
                 ? '基本予定'
                 : (slot.source === 'manual' ? '月間設定' : '未入力');
-            return `${slot.label} ${formatMinutes(slot.start_minutes)}以降：**${meta.symbol} ${meta.label}**（${source}）`;
+            return `${slot.label}：**${meta.symbol} ${meta.label}**（${source}）`;
         });
         const embed = new EmbedBuilder()
             .setColor(0x57F287)
@@ -226,10 +221,10 @@ class SchedulePanelService {
         const pageGames = games.slice(page * GAME_PAGE_SIZE, (page + 1) * GAME_PAGE_SIZE);
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
-            .setTitle(`🔎 ${monthTitle(month)}の候補日時`)
+            .setTitle(`🔎 ${monthTitle(month)}の候補日程`)
             .setDescription(pageGames.length
-                ? '候補日時を集計するゲームを選択してください。'
-                : '現在、候補日時を集計できる稼働中ゲームはありません。');
+                ? '候補日程を集計するゲームを選択してください。'
+                : '現在、候補日程を集計できる稼働中ゲームはありません。');
         const components = [];
         if (pageGames.length) {
             components.push(new ActionRowBuilder().addComponents(
@@ -273,19 +268,19 @@ class SchedulePanelService {
             candidate => candidate.slotId === Number(selectedSlotId)
         );
         const lines = topCandidates.map((candidate, index) => [
-            `**${index + 1}. ${formatDateLabel(candidate.localDate)} ${formatMinutes(candidate.startMinutes)}**`,
+            `**${index + 1}. ${formatDateLabel(candidate.localDate)} ${candidate.label}**`,
             `○ ${candidate.availableCount}人 / △ ${candidate.maybeCount}人 / × ${candidate.unavailableCount}人`
         ].join('\n'));
         const embed = new EmbedBuilder()
             .setColor(0x57F287)
-            .setTitle(`🎮 ${result.game.display_name}の候補日時`)
+            .setTitle(`🎮 ${result.game.display_name}の候補日程`)
             .setDescription(lines.length
                 ? [
                     `対象：${monthTitle(result.month)}`,
-                    '募集する未来の候補日時を選択してください。',
+                    '募集する候補日程を選択してください。',
                     ...lines
                 ].join('\n\n')
-                : `対象：${monthTitle(result.month)}\n\n未来の○または△の候補日時はありません。`);
+                : `対象：${monthTitle(result.month)}\n\n当日以降の○または△の候補日程はありません。`);
         const components = [];
         if (topCandidates.length) {
             components.push(new ActionRowBuilder().addComponents(
@@ -293,9 +288,9 @@ class SchedulePanelService {
                     .setCustomId(
                         `schedule-user:candidate-slot-select:${result.month.id}:${result.game.id}:${gamePage}`
                     )
-                    .setPlaceholder('募集する候補日時を選択')
+                    .setPlaceholder('募集する候補日程を選択')
                     .addOptions(topCandidates.map((candidate, index) => ({
-                        label: `${index + 1}. ${formatDateLabel(candidate.localDate)} ${formatMinutes(candidate.startMinutes)}`
+                        label: `${index + 1}. ${formatDateLabel(candidate.localDate)} ${candidate.label}`
                             .slice(0, 100),
                         value: String(candidate.slotId),
                         description: `○ ${candidate.availableCount}人 / △ ${candidate.maybeCount}人 / × ${candidate.unavailableCount}人`,
@@ -308,7 +303,7 @@ class SchedulePanelService {
                 .setCustomId(
                     `schedule-user:candidate-recruit:${result.month.id}:${result.game.id}:${gamePage}:${selectedCandidate?.slotId ?? 'none'}`
                 )
-                .setLabel('この日時で募集する')
+                .setLabel('この日程で募集する')
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(!selectedCandidate),
             new ButtonBuilder()
