@@ -59,6 +59,29 @@ class ConfigLoader {
         throw new Error(`必須項目 "${key}" が設定されていません`);
       }
     }
+
+    if (this.get('activity.enabled') === true) {
+      if (this.get('webui.enabled') !== true) {
+        throw new Error('Activityを利用するには "webui.enabled" を true にしてください');
+      }
+
+      for (const [key, minLength] of [
+        ['discord.clientSecret', 1],
+        ['activity.sessionSecret', 32]
+      ]) {
+        const value = this.get(key);
+        if (typeof value !== 'string' || value.trim().length < minLength || value.includes('YOUR_')) {
+          throw new Error(`Activityの必須項目 "${key}" に ${minLength} 文字以上の有効な文字列を設定してください`);
+        }
+      }
+
+      const configuredTtl = this.get('activity.sessionTtlSeconds');
+      const ttl = configuredTtl === undefined ? 300 : configuredTtl;
+      if (!Number.isInteger(ttl) || ttl < 30 || ttl > 3600) {
+        throw new Error('"activity.sessionTtlSeconds" は 30 以上 3600 以下の整数で指定してください');
+      }
+      this.config.activity.sessionTtlSeconds = ttl;
+    }
   }
 
   /**

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import database from './database.js';
 
 function nowIso() {
@@ -140,6 +141,19 @@ class AvailabilityRepository {
         `).all(guildId, monthId);
     }
 
+    listMonthResponses(guildId, monthId) {
+        if (!database.isInitialized) return [];
+        return database.connection().prepare(`
+            SELECT slot.*, answer.user_id, answer.status, answer.source
+            FROM availability_slots slot
+            JOIN availability_months month ON month.id = slot.month_id
+            LEFT JOIN user_availability answer
+              ON answer.slot_id = slot.id AND answer.guild_id = month.guild_id
+            WHERE month.guild_id = ? AND month.id = ?
+            ORDER BY slot.local_date, slot.sort_order, slot.id, answer.user_id
+        `).all(guildId, monthId);
+    }
+
     listBasicPatterns(guildId, userId, dayRule = null) {
         if (!database.isInitialized) return [];
         if (dayRule !== null) {
@@ -263,30 +277,62 @@ class AvailabilityRepository {
                 status = excluded.status,
                 source = excluded.source,
                 updated_at = excluded.updated_at
+            WHERE user_availability.status <> excluded.status
+               OR user_availability.source <> excluded.source
         `).run(guildId, userId, slotId, status, source, now, now);
         return this.findUserSlot(guildId, userId, slotId);
     }
 
-    resetDateRangeToBasic({ guildId, userId, monthId, startDate, endDate }) {
+    getDateRangeResetPreview({ guildId, userId, monthId, startDate, endDate }) {
+        const slots = database.connection().prepare(`
+            SELECT slot.*, answer.status, answer.source,
+                   answer.updated_at AS answer_updated_at,
+                   pattern.status AS basic_status,
+                   pattern.updated_at AS basic_updated_at
+            FROM availability_slots slot
+            JOIN availability_months month ON month.id = slot.month_id
+            LEFT JOIN user_availability answer
+              ON answer.slot_id = slot.id AND answer.guild_id = month.guild_id
+             AND answer.user_id = ?
+            LEFT JOIN user_availability_patterns pattern
+              ON pattern.guild_id = month.guild_id AND pattern.user_id = ?
+             AND pattern.day_rule = slot.day_rule AND pattern.template_id = slot.template_id
+            WHERE month.guild_id = ? AND month.id = ?
+              AND slot.local_date BETWEEN ? AND ?
+            ORDER BY slot.local_date, slot.sort_order, slot.id
+        `).all(userId, userId, guildId, monthId, startDate, endDate);
+        // Include identity, missing rows, answer provenance and the applicable basic
+        // schedule. A preview cannot authorize a different user, month or range.
+        const snapshot = [guildId, userId, monthId, startDate, endDate, slots.map(slot => [
+            slot.id, slot.local_date, slot.template_id, slot.day_rule,
+            slot.status, slot.source, slot.answer_updated_at,
+            slot.basic_status, slot.basic_updated_at
+        ])];
+        const revision = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+        return { slots, revision };
+    }
+
+    resetDateRangeToBasic({ guildId, userId, monthId, startDate, endDate, revision }) {
         return database.transaction(() => {
-            database.connection().prepare(`
-                DELETE FROM user_availability
-                WHERE guild_id = ? AND user_id = ?
-                  AND slot_id IN (
-                      SELECT id FROM availability_slots
-                      WHERE month_id = ? AND local_date BETWEEN ? AND ?
-                  )
-            `).run(guildId, userId, monthId, startDate, endDate);
+            if (revision !== undefined) {
+                const current = this.getDateRangeResetPreview({ guildId, userId, monthId, startDate, endDate });
+                if (revision !== current.revision) {
+                    const error = new Error('対象範囲または基本予定が更新されました。最新の内容を再確認してください');
+                    error.status = 409;
+                    error.code = 'RESET_CONFLICT';
+                    throw error;
+                }
+            }
             const now = nowIso();
             return database.connection().prepare(`
                 INSERT INTO user_availability (
                     guild_id, user_id, slot_id, status, source, created_at, updated_at
                 )
-                SELECT pattern.guild_id, pattern.user_id, slot.id,
-                       pattern.status, 'basic', ?, ?
+                SELECT month.guild_id, ?, slot.id,
+                       COALESCE(pattern.status, 'unset'), 'basic', ?, ?
                 FROM availability_slots slot
                 JOIN availability_months month ON month.id = slot.month_id
-                JOIN user_availability_patterns pattern
+                LEFT JOIN user_availability_patterns pattern
                   ON pattern.guild_id = month.guild_id
                  AND pattern.user_id = ?
                  AND pattern.day_rule = slot.day_rule
@@ -297,8 +343,8 @@ class AvailabilityRepository {
                     status = excluded.status,
                     source = 'basic',
                     updated_at = excluded.updated_at
-            `).run(now, now, userId, guildId, monthId, startDate, endDate).changes;
-        })();
+            `).run(userId, now, now, userId, guildId, monthId, startDate, endDate).changes;
+        }).immediate();
     }
 
     listCandidateResponses(guildId, monthId, gameId) {

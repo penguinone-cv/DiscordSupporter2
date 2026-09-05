@@ -1,3 +1,4 @@
+import { MessageFlags } from 'discord.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -5,15 +6,20 @@ const {
     buildBasicEditor,
     buildCandidateResults,
     cycleBasicStatus,
-    createRecruitment
+    createRecruitment,
+    getConfig
 } = vi.hoisted(() => ({
     buildMainPanel: vi.fn(),
     buildBasicEditor: vi.fn(),
     buildCandidateResults: vi.fn(),
     cycleBasicStatus: vi.fn(),
-    createRecruitment: vi.fn()
+    createRecruitment: vi.fn(),
+    getConfig: vi.fn()
 }));
 
+vi.mock('../../src/config/configLoader.js', () => ({
+    default: { get: getConfig }
+}));
 vi.mock('../../src/services/gameMemberPanelService.js', () => ({
     default: { buildMainPanel }
 }));
@@ -32,6 +38,7 @@ import handleScheduleMemberInteraction from '../../src/interactions/scheduleMemb
 describe('scheduleMemberInteractionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getConfig.mockReturnValue(false);
         buildMainPanel.mockReturnValue({ content: 'home' });
         buildBasicEditor.mockReturnValue({ content: 'basic' });
         buildCandidateResults.mockResolvedValue({ content: 'candidates' });
@@ -51,9 +58,57 @@ describe('scheduleMemberInteractionHandler', () => {
             update: vi.fn().mockResolvedValue(undefined),
             deferUpdate: vi.fn().mockResolvedValue(undefined),
             editReply: vi.fn().mockResolvedValue(undefined),
+            deferReply: vi.fn().mockResolvedValue(undefined),
+            launchActivity: vi.fn().mockResolvedValue(undefined),
             ...overrides
         };
     }
+
+    it('有効なActivityを保留や通常応答せず直接起動する', async () => {
+        getConfig.mockReturnValue(true);
+        const target = interaction({ customId: 'schedule-user:activity-open' });
+
+        await handleScheduleMemberInteraction(target);
+
+        expect(getConfig).toHaveBeenCalledWith('activity.enabled');
+        expect(target.launchActivity).toHaveBeenCalledOnce();
+        expect(target.deferUpdate).not.toHaveBeenCalled();
+        expect(target.deferReply).not.toHaveBeenCalled();
+        expect(target.reply).not.toHaveBeenCalled();
+        expect(target.update).not.toHaveBeenCalled();
+    });
+
+    it('Activity無効時には本人だけに週表示の利用を案内する', async () => {
+        const target = interaction({ customId: 'schedule-user:activity-open' });
+
+        await handleScheduleMemberInteraction(target);
+
+        expect(target.launchActivity).not.toHaveBeenCalled();
+        expect(target.reply).toHaveBeenCalledWith({
+            content: 'カレンダーは現在利用できません。「月間予定（週表示）」から予定を編集してください。',
+            flags: MessageFlags.Ephemeral
+        });
+    });
+    it('Activity起動失敗時にも週表示を案内する', async () => {
+        getConfig.mockReturnValue(true);
+        const target = interaction({ customId: 'schedule-user:activity-open', launchActivity: vi.fn().mockRejectedValue(new Error('unavailable')) });
+        await handleScheduleMemberInteraction(target);
+        expect(target.reply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('月間予定（週表示）'), flags: MessageFlags.Ephemeral }));
+    });
+
+    it.each([
+        ['サーバー外', { inGuild: () => false }, 'サーバー内でのみ操作できます'],
+        ['Bot', { user: { id: 'bot-1', bot: true } }, '一般メンバーのみ操作できます'],
+        ['ユーザー不明', { user: null }, '一般メンバーのみ操作できます']
+    ])('%sからActivityを起動させない', async (_label, overrides, error) => {
+        getConfig.mockReturnValue(true);
+        const target = interaction({ customId: 'schedule-user:activity-open', ...overrides });
+
+        await expect(handleScheduleMemberInteraction(target)).rejects.toThrow(error);
+
+        expect(target.launchActivity).not.toHaveBeenCalled();
+        expect(getConfig).not.toHaveBeenCalled();
+    });
 
     it('公開パネルから基本予定を本人だけに表示する', async () => {
         const target = interaction();

@@ -1,4 +1,4 @@
-import { Collection } from 'discord.js';
+import { ButtonStyle, Collection } from 'discord.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import database from '../../src/repositories/database.js';
 import gameRepository from '../../src/repositories/gameRepository.js';
@@ -60,6 +60,7 @@ describe('gameMemberPanelService', () => {
         });
 
         expect(scheduleButtons.map(button => button.custom_id)).toEqual([
+            'schedule-user:activity-open',
             'schedule-user:month-open:0:0',
             'schedule-user:basic:0',
             'schedule-user:candidate-open:0:0'
@@ -70,6 +71,22 @@ describe('gameMemberPanelService', () => {
         ]);
         expect(payloadText).toContain('候補日程');
         expect(payloadText).not.toContain('候補日時');
+        expect(scheduleButtons[0]).toEqual(expect.objectContaining({
+            label: '月間予定を編集', style: ButtonStyle.Primary
+        }));
+        expect(scheduleButtons[1]).toEqual(expect.objectContaining({
+            label: '月間予定（週表示）', style: ButtonStyle.Secondary
+        }));
+        expect(scheduleButtons).toHaveLength(4);
+    });
+
+    it('月間予定の共有範囲とゲーム希望者の非公開を区別して案内する', () => {
+        const payload = gameMemberPanelService.buildMainPanel();
+        const description = payload.embeds[0].toJSON().description;
+
+        expect(description).toContain('月間予定はサーバーの全メンバーが閲覧でき、編集できるのは本人だけです。');
+        expect(description).toContain('ゲームの希望内容と希望者の名前は他のメンバーには表示されません。');
+        expect(description).not.toContain('操作内容と希望者の名前');
     });
 
     it('稼働中ゲームを複数選択でき、現在の希望を初期選択へ反映する', () => {

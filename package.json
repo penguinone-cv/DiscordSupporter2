@@ -11,7 +11,9 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:activity": "vite build --config vite.activity.config.js",
+    "dev:activity": "vite --config vite.activity.config.js"
   },
   "keywords": [
     "discord",
@@ -22,6 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "@holiday-jp/holiday_jp": "^2.5.1",
     "better-sqlite3": "^12.10.0",
     "csv-parse": "^5.5.3",
@@ -31,6 +34,9 @@
     "openai": "^4.24.1"
   },
   "devDependencies": {
+    "happy-dom": "^20.14.0",
+    "supertest": "^7.2.2",
+    "vite": "^8.2.2",
     "vitest": "^4.1.1"
   }
 }

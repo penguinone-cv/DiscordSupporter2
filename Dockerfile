@@ -7,13 +7,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
+COPY activity ./activity
+COPY vite.activity.config.js ./
+RUN npm run build:activity && npm prune --omit=dev
 
 # 実行用イメージにはビルドツールを含めない
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
+COPY --from=dependencies /app/public/schedule ./public/schedule
 
 # ポート3000を公開（WebUI用）
 EXPOSE 3000

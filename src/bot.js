@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
+import { ApplicationCommandType, Client, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
 import config from './config/configLoader.js';
 import openaiService from './services/openaiService.js';
 import recruitmentDetector from './services/recruitmentDetector.js';
@@ -23,6 +23,15 @@ import gameReturnRequestService from './services/gameReturnRequestService.js';
 import scheduleService from './services/scheduleService.js';
 import maintenanceService from './services/maintenanceService.js';
 import logger from './utils/logger.js';
+
+// Bulk registration also replaces Portal-managed Activity entry points.
+// Preserve only fields accepted by the global application-command write API.
+const ENTRY_POINT_WRITE_FIELDS = [
+    'type', 'name', 'description', 'handler',
+    'name_localizations', 'description_localizations',
+    'default_member_permissions', 'dm_permission', 'default_permission',
+    'nsfw', 'integration_types', 'contexts'
+];
 
 /**
  * Discord Botの初期化と起動
@@ -69,7 +78,7 @@ class Bot {
 
         // WebUIサーバーを初期化（有効な場合のみ）
         if (config.get('webui.enabled')) {
-            webServer.initialize();
+            webServer.initialize({ discordClient: this.client });
         }
 
         // イベントハンドラーを登録
@@ -148,11 +157,23 @@ class Bot {
             logger.info('スラッシュコマンドを登録中...');
 
             const clientId = config.get('discord.clientId');
+            const route = Routes.applicationCommands(clientId);
+            const existingCommands = await rest.get(route, {
+                query: new URLSearchParams({ with_localizations: 'true' })
+            });
+            if (!Array.isArray(existingCommands)) {
+                throw new Error('既存のグローバルコマンド一覧を確認できないため、登録を中止しました');
+            }
+            const entryPoints = existingCommands
+                .filter(command => command.type === ApplicationCommandType.PrimaryEntryPoint)
+                .map(command => Object.fromEntries(ENTRY_POINT_WRITE_FIELDS
+                    .filter(field => command[field] !== undefined)
+                    .map(field => [field, command[field]])));
 
             // グローバルにコマンドを登録
             await rest.put(
-                Routes.applicationCommands(clientId),
-                { body: commands }
+                route,
+                { body: [...commands, ...entryPoints] }
             );
 
             logger.info(`✅ ${commands.length}個のスラッシュコマンドを登録しました`);

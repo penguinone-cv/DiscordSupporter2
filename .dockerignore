@@ -1,5 +1,6 @@
 # Dockerでの使用を想定した軽量な.dockerignore
 node_modules
+public/schedule
 npm-debug.log
 .git
 .gitignore

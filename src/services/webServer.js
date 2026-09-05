@@ -5,6 +5,10 @@ import stringify from 'csv-stringify/lib/sync.js';
 import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
 import reminderService from './reminderService.js';
+import { createActivityScheduleRouter } from '../routes/activityScheduleRouter.js';
+import { ActivityAuthService } from './activityAuthService.js';
+import { ActivitySessionService } from './activitySessionService.js';
+import activityScheduleService from './activityScheduleService.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -24,9 +28,35 @@ class WebServer {
     /**
      * サーバーを初期化
      */
-    initialize() {
+    initialize({ discordClient = global.discordClient } = {}) {
         this.app = express();
 
+        const activityEnabled = config.get('activity.enabled') === true;
+        const sessionService = activityEnabled ? new ActivitySessionService({
+            secret: config.get('activity.sessionSecret'),
+            ttlSeconds: config.get('activity.sessionTtlSeconds') ?? 300
+        }) : null;
+        const authService = activityEnabled ? new ActivityAuthService({
+            clientId: config.get('discord.clientId'),
+            clientSecret: config.get('discord.clientSecret'),
+            botToken: config.get('discord.token'),
+            discordClient,
+            sessionService
+        }) : null;
+        // Mount before the legacy JSON parser so the Activity size limit and error boundary apply.
+        this.app.use('/api/activity/schedule', createActivityScheduleRouter({
+            enabled: activityEnabled, clientId: config.get('discord.clientId'),
+            authService, sessionService, scheduleService: activityScheduleService
+        }));
+        this.app.use('/schedule', (_req, res, next) => {
+            res.set({
+                'Cache-Control': 'no-cache',
+                'X-Content-Type-Options': 'nosniff',
+                'Referrer-Policy': 'no-referrer',
+                'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors https://discord.com https://*.discord.com https://*.discordsays.com"
+            });
+            next();
+        });
         // ミドルウェア
         this.app.use(express.json());
         this.app.use(express.static(join(__dirname, '..', '..', 'public')));
