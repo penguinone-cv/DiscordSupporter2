@@ -42,6 +42,7 @@
 
         .tabs {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 20px;
             border-bottom: 2px solid #e0e0e0;
@@ -479,7 +480,8 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('data')">📝 データ編集</button>
             <button class="tab" onclick="switchTab('logs')">📊 検出ログ</button>
-            <a href="calendar" class="tab" style="text-decoration:none;display:flex;align-items:center;">📅 予定カレンダー</a>
+            <a href="calendar" class="tab" style="text-decoration:none;display:flex;align-items:center;">📅 リマインド予定</a>
+            <a href="schedule/" class="tab" style="text-decoration:none;display:flex;align-items:center;">🗓️ 月間予定（Activity）</a>
         </div>
 
         <!-- データ編集タブ -->

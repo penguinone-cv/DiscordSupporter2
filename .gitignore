@@ -1,5 +1,6 @@
 # Node modules
 node_modules/
+public/schedule/
 
 # Configuration files with sensitive data
 config.json

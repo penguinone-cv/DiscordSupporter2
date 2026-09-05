@@ -112,5 +112,74 @@ describe('ConfigLoader', () => {
 
             expect(() => configLoader.validate()).toThrow('必須項目 "discord.clientId" が設定されていません');
         });
+
+        describe('Activity設定', () => {
+            beforeEach(() => {
+                configLoader.config = {
+                    discord: {
+                        token: 'real-token', clientId: 'real-client-id',
+                        clientSecret: 'real-client-secret'
+                    },
+                    openai: { apiKey: 'real-api-key' },
+                    webui: { enabled: true },
+                    activity: { enabled: true, sessionSecret: 's'.repeat(32) }
+                };
+            });
+
+            it('有効な設定では任意のセッション有効期間を300秒に補う', () => {
+                expect(() => configLoader.validate()).not.toThrow();
+                expect(configLoader.get('activity.sessionTtlSeconds')).toBe(300);
+            });
+
+            it.each([30, 300, 3600])('セッション有効期間%d秒を受け付ける', value => {
+                configLoader.config.activity.sessionTtlSeconds = value;
+                expect(() => configLoader.validate()).not.toThrow();
+                expect(configLoader.get('activity.sessionTtlSeconds')).toBe(value);
+            });
+
+            it.each([undefined, false, 'true'])('WebUIが明示的に有効でない場合を拒否する: %s', enabled => {
+                configLoader.config.webui.enabled = enabled;
+                expect(() => configLoader.validate()).toThrow('webui.enabled');
+            });
+
+            it('WebUI設定がない場合を拒否する', () => {
+                delete configLoader.config.webui;
+                expect(() => configLoader.validate()).toThrow('webui.enabled');
+            });
+
+            it.each([undefined, '', '   ', 'YOUR_DISCORD_CLIENT_SECRET_HERE', 123, {}])(
+                '無効なDiscordシークレットを拒否する: %j', value => {
+                    configLoader.config.discord.clientSecret = value;
+                    expect(() => configLoader.validate()).toThrow('discord.clientSecret');
+                }
+            );
+
+            it.each([undefined, '', ' '.repeat(32), 's'.repeat(31), 'YOUR_RANDOM_SESSION_SECRET_HERE_32', 123, {}])(
+                '無効なセッションシークレットを拒否する: %j', value => {
+                    configLoader.config.activity.sessionSecret = value;
+                    expect(() => configLoader.validate()).toThrow('activity.sessionSecret');
+                }
+            );
+
+            it.each([null, 29, 3601, 30.5, '300', true])('無効な有効期間を拒否する: %j', value => {
+                configLoader.config.activity.sessionTtlSeconds = value;
+                expect(() => configLoader.validate()).toThrow('activity.sessionTtlSeconds');
+            });
+
+            it('無効化時はシークレット未設定・不正な追加設定でも旧設定との互換を保つ', () => {
+                configLoader.config.activity = { enabled: false, sessionTtlSeconds: 1 };
+                delete configLoader.config.discord.clientSecret;
+                delete configLoader.config.webui;
+                expect(() => configLoader.validate()).not.toThrow();
+            });
+
+            it('Activity設定がない旧設定を変更しない', () => {
+                delete configLoader.config.activity;
+                delete configLoader.config.discord.clientSecret;
+                delete configLoader.config.webui;
+                expect(() => configLoader.validate()).not.toThrow();
+                expect(configLoader.get('activity')).toBeUndefined();
+            });
+        });
     });
 });

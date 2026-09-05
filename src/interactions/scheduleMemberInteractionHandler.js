@@ -1,4 +1,5 @@
 import { MessageFlags } from 'discord.js';
+import config from '../config/configLoader.js';
 import gameMemberPanelService from '../services/gameMemberPanelService.js';
 import gameRecruitmentService from '../services/gameRecruitmentService.js';
 import scheduleService from '../services/scheduleService.js';
@@ -22,6 +23,26 @@ export default async function handleScheduleMemberInteraction(interaction) {
     assertGuildMember(interaction);
     const [, action, ...args] = interaction.customId.split(':');
     const userId = interaction.user.id;
+
+    if (action === 'activity-open') {
+        if (config.get('activity.enabled') === true) {
+            try {
+                return await interaction.launchActivity();
+            } catch {
+                const fallback = {
+                    content: 'カレンダーを起動できませんでした。「月間予定（週表示）」から予定を編集してください。',
+                    flags: MessageFlags.Ephemeral
+                };
+                return interaction.replied || interaction.deferred
+                    ? interaction.followUp(fallback)
+                    : interaction.reply(fallback);
+            }
+        }
+        return interaction.reply({
+            content: 'カレンダーは現在利用できません。「月間予定（週表示）」から予定を編集してください。',
+            flags: MessageFlags.Ephemeral
+        });
+    }
 
     if (action === 'home') {
         return show(interaction, gameMemberPanelService.buildMainPanel());

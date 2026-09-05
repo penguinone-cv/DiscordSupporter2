@@ -1,36 +1,13 @@
 import gameRepository from '../repositories/gameRepository.js';
 import availabilityRepository from '../repositories/availabilityRepository.js';
 import scheduleService from './scheduleService.js';
+import guildMemberService from './guildMemberService.js';
 import { currentDateKey } from '../utils/scheduleDate.js';
 
 class GameCandidateService {
-    constructor() {
-        this.memberFetches = new Map();
-    }
-
     listGames(guildId) {
         return gameRepository.listByGuild(guildId, 'active')
             .filter(game => game.current_channel_id);
-    }
-
-    async currentMembers(guild) {
-        const manager = guild.members;
-        const cached = manager?.cache;
-        if (!cached || typeof manager.fetch !== 'function') {
-            throw new Error('サーバーメンバーを取得できません');
-        }
-
-        if (Number.isInteger(guild.memberCount) && cached.size >= guild.memberCount) {
-            return cached;
-        }
-
-        let pending = this.memberFetches.get(guild.id);
-        if (!pending) {
-            pending = manager.fetch()
-                .finally(() => this.memberFetches.delete(guild.id));
-            this.memberFetches.set(guild.id, pending);
-        }
-        return pending;
     }
 
     async aggregate(guild, monthId, gameId, now = new Date()) {
@@ -46,7 +23,7 @@ class GameCandidateService {
         // 月間画面をまだ開いていないユーザーも、登録済みの基本予定から集計する。
         // すでに月間予定がある日時枠はリポジトリ側の競合処理で上書きしない。
         availabilityRepository.materializeBasicForAllUsers(guild.id, month.id);
-        const members = await this.currentMembers(guild);
+        const members = await guildMemberService.currentMembers(guild);
         const today = currentDateKey(now, month.timezone);
 
         const grouped = new Map();
@@ -57,7 +34,7 @@ class GameCandidateService {
         )) {
             if (row.local_date < today) continue;
             const member = members.get(row.user_id);
-            if (!member || member.user?.bot !== false) continue;
+            if (!member) continue;
             if (!grouped.has(row.slot_id)) {
                 grouped.set(row.slot_id, {
                     slotId: row.slot_id,
