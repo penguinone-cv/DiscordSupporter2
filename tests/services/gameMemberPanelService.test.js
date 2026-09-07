@@ -72,7 +72,7 @@ describe('gameMemberPanelService', () => {
         expect(payloadText).toContain('候補日程');
         expect(payloadText).not.toContain('候補日時');
         expect(scheduleButtons[0]).toEqual(expect.objectContaining({
-            label: '月間予定を編集', style: ButtonStyle.Primary
+            label: '予定・候補日を開く', style: ButtonStyle.Primary
         }));
         expect(scheduleButtons[1]).toEqual(expect.objectContaining({
             label: '月間予定（週表示）', style: ButtonStyle.Secondary
@@ -80,12 +80,12 @@ describe('gameMemberPanelService', () => {
         expect(scheduleButtons).toHaveLength(4);
     });
 
-    it('月間予定の共有範囲とゲーム希望者の非公開を区別して案内する', () => {
+    it('月間予定と候補回答者の共有範囲を案内する', () => {
         const payload = gameMemberPanelService.buildMainPanel();
         const description = payload.embeds[0].toJSON().description;
 
         expect(description).toContain('月間予定はサーバーの全メンバーが閲覧でき、編集できるのは本人だけです。');
-        expect(description).toContain('ゲームの希望内容と希望者の名前は他のメンバーには表示されません。');
+        expect(description).toContain('候補日確認では、ゲーム希望者の名前とその日の○△×回答が同じサーバーのメンバーに表示されます。');
         expect(description).not.toContain('操作内容と希望者の名前');
     });
 

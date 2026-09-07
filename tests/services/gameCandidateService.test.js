@@ -89,7 +89,12 @@ describe('gameCandidateService', () => {
                 availableCount: 1,
                 maybeCount: 1,
                 unavailableCount: 1,
-                includingMaybeCount: 2
+                includingMaybeCount: 2,
+                members: [
+                    { userId: 'user-1', displayName: 'user-1', status: 'available' },
+                    { userId: 'user-2', displayName: 'user-2', status: 'maybe' },
+                    { userId: 'user-3', displayName: 'user-3', status: 'unavailable' }
+                ]
             })
         ]);
     });

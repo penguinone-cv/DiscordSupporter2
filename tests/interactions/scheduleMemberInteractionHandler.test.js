@@ -85,7 +85,7 @@ describe('scheduleMemberInteractionHandler', () => {
 
         expect(target.launchActivity).not.toHaveBeenCalled();
         expect(target.reply).toHaveBeenCalledWith({
-            content: 'カレンダーは現在利用できません。「月間予定（週表示）」から予定を編集してください。',
+            content: 'カレンダーは現在利用できません。「月間予定（週表示）」または「候補日確認（従来表示）」をご利用ください。',
             flags: MessageFlags.Ephemeral
         });
     });

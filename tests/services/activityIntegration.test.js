@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import config from '../../src/config/configLoader.js';
 import database from '../../src/repositories/database.js';
 import availabilityRepository from '../../src/repositories/availabilityRepository.js';
+import gameRepository from '../../src/repositories/gameRepository.js';
+import gameInterestRepository from '../../src/repositories/gameInterestRepository.js';
 import { ActivitySessionService } from '../../src/services/activitySessionService.js';
 import scheduleService from '../../src/services/scheduleService.js';
 import webServer from '../../src/services/webServer.js';
@@ -73,6 +75,27 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
         expect(result.headers['cache-control']).toBe('no-store');
         return result.body;
     }
+
+    it('候補APIは実DBのゲーム希望者の人数と名前を返し他guildのゲームを拒否する', async () => {
+        const game = gameRepository.registerChannel({ guildId: GUILD_ID, channelId: 'game-channel', channelName: 'game', parentCategoryId: 'category' });
+        const foreign = gameRepository.registerChannel({ guildId: 'foreign', channelId: 'foreign-channel', channelName: 'foreign', parentCategoryId: 'category' });
+        const month = await readMonth();
+        const slot = month.slots.find(item => item.localDate === MONDAY);
+        for (const [userId, status] of [['self', 'available'], ['other', 'unavailable']]) {
+            gameInterestRepository.replacePreferencesForGames({ guildId: GUILD_ID, userId, gameIds: [game.id], preferredGameIds: [game.id] });
+            await putStatus(month.month.id, slot.id, status, userId);
+        }
+        const games = await authorized(request(webServer.app).get(`${BASE}/candidate-games`));
+        expect(games.body.games.map(item => item.id)).toEqual([game.id]);
+        const result = await authorized(request(webServer.app).get(`${BASE}/candidates?offset=0&gameId=${game.id}`));
+        expect(result.status).toBe(200);
+        expect(result.body.candidates).toEqual([expect.objectContaining({ availableCount: 1, unavailableCount: 1, recruitment: null,
+            members: expect.arrayContaining([{ userId: 'self', displayName: 'ペンギン', status: 'available' }, { userId: 'other', displayName: 'あざらし', status: 'unavailable' }])
+        })]);
+        expect((await authorized(request(webServer.app).get(`${BASE}/candidates?gameId=${foreign.id}`))).status).toBe(404);
+        const foreignMonth = scheduleService.ensureMonth('foreign', 2026, 9);
+        expect((await authorized(request(webServer.app).post(`${BASE}/recruitments`)).send({ monthId: foreignMonth.id, gameId: game.id, slotId: slot.id })).status).toBe(404);
+    });
 
     async function readDay(monthId, date = MONDAY) {
         const result = await authorized(request(webServer.app).get(`${BASE}/months/${monthId}/days/${date}`));

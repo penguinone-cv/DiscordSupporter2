@@ -30,7 +30,7 @@ export default async function handleScheduleMemberInteraction(interaction) {
                 return await interaction.launchActivity();
             } catch {
                 const fallback = {
-                    content: 'カレンダーを起動できませんでした。「月間予定（週表示）」から予定を編集してください。',
+                    content: 'カレンダーを起動できませんでした。「月間予定（週表示）」または「候補日確認（従来表示）」をご利用ください。',
                     flags: MessageFlags.Ephemeral
                 };
                 return interaction.replied || interaction.deferred
@@ -39,7 +39,7 @@ export default async function handleScheduleMemberInteraction(interaction) {
             }
         }
         return interaction.reply({
-            content: 'カレンダーは現在利用できません。「月間予定（週表示）」から予定を編集してください。',
+            content: 'カレンダーは現在利用できません。「月間予定（週表示）」または「候補日確認（従来表示）」をご利用ください。',
             flags: MessageFlags.Ephemeral
         });
     }

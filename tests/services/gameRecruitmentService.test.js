@@ -350,7 +350,7 @@ describe('gameRecruitmentService', () => {
         expect(gameRecruitmentRepository.reserve).not.toHaveBeenCalled();
     });
 
-    it('未来候補でも集計順の上位10件より後は募集できない', async () => {
+    it('11件目以降の有効な候補でも募集できる', async () => {
         const candidates = Array.from({ length: 11 }, (_value, index) => ({
             ...candidate,
             slotId: 100 + index,
@@ -364,9 +364,9 @@ describe('gameRecruitmentService', () => {
             gameId: game.id,
             slotId: candidates[10].slotId,
             userId: 'creator-1'
-        })).rejects.toThrow('募集できる候補日程は上位10件までです');
+        })).resolves.toHaveProperty('recruitment');
 
-        expect(gameRecruitmentRepository.reserve).not.toHaveBeenCalled();
+        expect(gameRecruitmentRepository.reserve).toHaveBeenCalledWith(expect.objectContaining({ slotId: candidates[10].slotId }));
     });
 
     it('送信失敗時は予約を解放する', async () => {

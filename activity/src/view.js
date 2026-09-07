@@ -1,6 +1,6 @@
 import { buildMonthGrid, STATUSES, slotLabel, statusLabel, WEEKDAYS } from './calendarModel.js';
 
-function element(tag, attrs = {}, ...children) {
+export function element(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
         if (value === false || value == null) continue;

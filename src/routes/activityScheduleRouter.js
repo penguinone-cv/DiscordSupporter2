@@ -32,7 +32,7 @@ function rateLimit(limit, keyOf) {
     };
 }
 
-export function createActivityScheduleRouter({ enabled, clientId, authService, sessionService, scheduleService }) {
+export function createActivityScheduleRouter({ enabled, clientId, authService, sessionService, scheduleService, candidateService }) {
     const router = express.Router();
     const route = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res, next)).catch(next);
     router.use((_req, res, next) => {
@@ -62,6 +62,21 @@ export function createActivityScheduleRouter({ enabled, clientId, authService, s
         next();
     }));
     const owner = req => ({ guildId: req.activityIdentity.guildId, userId: req.activityIdentity.userId });
+    router.get('/candidate-games', route(async (req, res) => {
+        if (Object.keys(req.query).length) throw invalidRequest();
+        res.json(await candidateService.listGames(req.activityGuild));
+    }));
+    router.get('/candidates', route(async (req, res) => {
+        if (Object.keys(req.query).some(key => !['offset', 'gameId'].includes(key))) throw invalidRequest();
+        const offset = req.query.offset ?? '0';
+        if (!['0', '1'].includes(offset)) throw invalidRequest();
+        res.json(await candidateService.getCandidates(req.activityGuild, Number(offset), positiveId(req.query.gameId)));
+    }));
+    router.post('/recruitments', route(async (req, res) => {
+        const input = bodyFields(req.body, ['monthId', 'gameId', 'slotId']);
+        for (const key of Object.keys(input)) input[key] = positiveId(input[key]);
+        res.status(201).json(await candidateService.createRecruitment({ ...input, guild: req.activityGuild, userId: req.activityIdentity.userId }));
+    }));
     router.get('/month', route(async (req, res) => {
         if (Object.keys(req.query).some(key => key !== 'offset')) throw invalidRequest();
         const offset = req.query.offset ?? '0';
