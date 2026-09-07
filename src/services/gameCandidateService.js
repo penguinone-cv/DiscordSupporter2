@@ -46,10 +46,16 @@ class GameCandidateService {
                     availableCount: 0,
                     maybeCount: 0,
                     unavailableCount: 0,
-                    includingMaybeCount: 0
+                    includingMaybeCount: 0,
+                    members: []
                 });
             }
             const aggregate = grouped.get(row.slot_id);
+            aggregate.members.push({
+                userId: row.user_id,
+                displayName: member.displayName ?? member.nickname ?? member.user?.globalName ?? member.user?.username ?? row.user_id,
+                status: row.status
+            });
             if (row.status === 'available') aggregate.availableCount += 1;
             if (row.status === 'maybe') aggregate.maybeCount += 1;
             if (row.status === 'unavailable') aggregate.unavailableCount += 1;

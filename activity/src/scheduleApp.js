@@ -1,10 +1,10 @@
 import { selectedRange } from './calendarModel.js';
 import { renderSchedule } from './view.js';
 
-export function createScheduleApp(root, { api, pollMs = 5000 } = {}) {
+export function createScheduleApp(root, { api, pollMs = 5000, onBusy = () => {} } = {}) {
     const state = { data: null, offset: 0, day: null, selectedDate: null, rangeStart: null, range: null, preview: null, busy: false, error: '', message: '', layoutMode: -1 };
     let timer, inFlight, destroyed = false, started = false, generation = 0;
-    const render = () => { if (!destroyed) renderSchedule(root, state, actions); };
+    const render = () => { if (!destroyed) { onBusy(state.busy || Boolean(state.day || state.preview)); renderSchedule(root, state, actions); } };
     const canPoll = () => started && !destroyed && !document.hidden && state.layoutMode === 0;
     const schedule = () => {
         clearTimeout(timer);

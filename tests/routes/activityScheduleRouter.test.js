@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createActivityScheduleRouter } from '../../src/routes/activityScheduleRouter.js';
 
 describe('Activity schedule API', () => {
-    let app, authService, sessionService, scheduleService;
+    let app, authService, sessionService, scheduleService, candidateService;
     const identity = { userId: 'self', guildId: 'guild', instanceId: 'instance' };
     const guild = { id: 'guild' };
     beforeEach(() => {
@@ -20,13 +20,35 @@ describe('Activity schedule API', () => {
             previewReset: vi.fn().mockReturnValue({ revision: 'revision', slotCount: 2 }),
             resetRange: vi.fn().mockReturnValue({ slotCount: 2 })
         };
+        candidateService = {
+            listGames: vi.fn().mockReturnValue({ games: [] }),
+            getCandidates: vi.fn().mockResolvedValue({ candidates: [] }),
+            createRecruitment: vi.fn().mockResolvedValue({ recruitmentId: 7 })
+        };
         app = express();
         app.use('/api/activity/schedule', createActivityScheduleRouter({
-            enabled: true, clientId: 'public-app-id', authService, sessionService, scheduleService
+            enabled: true, clientId: 'public-app-id', authService, sessionService, scheduleService, candidateService
         }));
     });
     const base = '/api/activity/schedule';
     const authorized = req => req.set('Authorization', 'Bearer session');
+
+    it('候補と募集APIにも所属認証を適用し本人を固定する', async () => {
+        expect((await request(app).get(`${base}/candidate-games`)).status).toBe(401);
+        expect((await authorized(request(app).get(`${base}/candidate-games`))).status).toBe(200);
+        expect(candidateService.listGames).toHaveBeenCalledWith(guild);
+        expect((await authorized(request(app).get(`${base}/candidates?offset=1&gameId=3`))).status).toBe(200);
+        expect(candidateService.getCandidates).toHaveBeenCalledWith(guild, 1, 3);
+        expect((await authorized(request(app).post(`${base}/recruitments`)).send({ monthId: 1, gameId: 3, slotId: 4 })).status).toBe(201);
+        expect(candidateService.createRecruitment).toHaveBeenCalledWith({ guild, userId: 'self', monthId: 1, gameId: 3, slotId: 4 });
+    });
+    it('候補の不正な月・ゲーム指定と募集の本人上書きを拒否する', async () => {
+        for (const query of ['offset=2&gameId=3', 'offset=0&gameId=-1', 'offset=0&gameId=3&guildId=other']) {
+            expect((await authorized(request(app).get(`${base}/candidates?${query}`))).status).toBe(400);
+        }
+        expect((await authorized(request(app).post(`${base}/recruitments`)).send({ monthId: 1, gameId: 3, slotId: 4, userId: 'other' })).status).toBe(400);
+        expect(candidateService.createRecruitment).not.toHaveBeenCalled();
+    });
 
     it('bootstrap以外の予定は未認証で返さず、キャッシュしない', async () => {
         const result = await request(app).get(`${base}/month`);

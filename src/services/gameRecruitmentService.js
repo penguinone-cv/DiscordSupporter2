@@ -170,12 +170,6 @@ class GameRecruitmentService {
         if (slot.localDate < today) {
             rejectRecruitment('過去の候補日程では募集できません');
         }
-        const topEligibleCandidates = aggregated.candidates
-            .filter(candidate => candidate.localDate >= today)
-            .slice(0, 10);
-        if (!topEligibleCandidates.some(candidate => String(candidate.slotId) === String(slotId))) {
-            rejectRecruitment('募集できる候補日程は上位10件までです');
-        }
 
         const channel = await fetchManagerEntry(guild.channels, game.current_channel_id);
         if (!isSendable(channel) || channel.guild?.id && channel.guild.id !== guild.id) {
