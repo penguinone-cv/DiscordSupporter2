@@ -73,7 +73,7 @@ Activityは既定で無効です。既存WebUIと同じサーバーへ配置し�
 
 公開ページは `https://www.penguinone.net/discord/schedule/` です。通常ブラウザーでは起動案内だけを表示し、予定は返しません。APIはOAuth本人・Activity起動元・現在所属を検証します。既存の管理用WebUI/APIは従来のアクセス制限を別途維持してください。
 
-詳細は [仕様書](docs/activity-schedule-specification.md)、[実装・運用手順書](docs/activity-schedule-runbook.md)、[検証結果](docs/activity-schedule-review.md) を参照してください。
+現行仕様は [仕様の正本](docs/spec/application.md) を参照してください。過去の [実装・運用手順書](docs/history/activity-schedule-runbook.md) と [検証結果](docs/history/activity-schedule-review.md) は当時の履歴として保持しています。
 
 Node.js製のDiscord Botアプリケーション。メンバー募集メッセージの自動検出、ゲームチャンネルでの自動ロール付与、投票機能を提供します。
 

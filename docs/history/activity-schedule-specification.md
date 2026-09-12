@@ -1,3 +1,5 @@
+> 過去の資料です。現在の仕様は[正本](../spec/application.md)を参照してください。
+
 # Discord Activity 月間予定カレンダー仕様書
 
 ## 1. 目的

@@ -1,7 +1,7 @@
 # ADR-0002: 現行アプリケーション境界と保存方式を基準化する
 
 - 日付: 2026-09-12
-- 状態: Accepted（現状の記録。過去の採用理由の復元ではない）
+- 状態: Superseded by [ADR-0005](0005-main-activity-baseline.md)（旧基点65bdf0eの記録）
 - 対応する正本: [APP-01〜03・06](../spec/application.md)
 
 ## 背景

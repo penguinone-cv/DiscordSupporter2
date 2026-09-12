@@ -5,9 +5,11 @@ ADR本文の保存場所。現在の仕様は [../spec/](../README.md) を参照
 | ID | 判断 | 状態 | 日付 |
 | --- | --- | --- | --- |
 | [0001](0001-specifications-and-decision-log.md) | 仕様の正本と設計判断履歴を分離する | Accepted | 2026-09-12 |
-| [0002](0002-application-boundaries.md) | 現行アプリケーション境界と保存方式を基準化する | Accepted（現状の記録） | 2026-09-12 |
-| [0003](0003-scheduling-and-recruitment.md) | 現行の予定・募集契約を基準化する | Accepted（現状の記録） | 2026-09-12 |
+| [0002](0002-application-boundaries.md) | 現行アプリケーション境界と保存方式を基準化する | Superseded by 0005 | 2026-09-12 |
+| [0003](0003-scheduling-and-recruitment.md) | 現行の予定・募集契約を基準化する | Superseded by 0005 | 2026-09-12 |
 | [0004](0004-risk-based-tests.md) | リスクに応じて必要なテストを残す | Accepted | 2026-09-12 |
+
+| [0005](0005-main-activity-baseline.md) | 最新mainのActivity仕様へ基準を更新する | Accepted | 2026-09-12 |
 
 「現状の記録」は過去の採用日や理由を推測したものではない。初回整理時に確認した実装を今後の変更の基準として扱う。課題のある現状を記録しても、改善不能という意味にはしない。
 
