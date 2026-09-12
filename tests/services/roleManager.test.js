@@ -32,46 +32,10 @@ beforeEach(async () => {
 });
 
 describe('RoleManager', () => {
-    describe('initialize()', () => {
-        it('config からカテゴリ名を取得して設定する', () => {
-            config.get.mockReturnValue('テストカテゴリ');
-            RoleManager.initialize();
-
-            expect(RoleManager.gameCategoryName).toBe('テストカテゴリ');
-        });
-
-        it('config が未設定の場合デフォルト値を使う', () => {
-            config.get.mockReturnValue(undefined);
-            RoleManager.initialize();
-
-            expect(RoleManager.gameCategoryName).toBe('ゲームチャンネル');
-        });
-    });
-
-    describe('isGameChannel()', () => {
-        beforeEach(() => {
-            RoleManager.gameCategoryName = 'ゲームチャンネル';
-        });
-
-        it('ゲームカテゴリのチャンネルで true を返す', () => {
-            const channel = { parent: { name: 'ゲームチャンネル' } };
-            expect(RoleManager.isGameChannel(channel)).toBe(true);
-        });
-
-        it('異なるカテゴリのチャンネルで false を返す', () => {
-            const channel = { parent: { name: '一般チャンネル' } };
-            expect(RoleManager.isGameChannel(channel)).toBe(false);
-        });
-
-        it('親カテゴリがない場合 false を返す', () => {
-            const channel = { parent: null };
-            expect(RoleManager.isGameChannel(channel)).toBe(false);
-        });
-    });
-
     describe('assignRoleByChannel()', () => {
         beforeEach(() => {
-            RoleManager.gameCategoryName = 'ゲームチャンネル';
+            config.get.mockReturnValue(undefined);
+            RoleManager.initialize();
         });
 
         it('非ゲームチャンネルでは何もしない', async () => {
@@ -84,12 +48,16 @@ describe('RoleManager', () => {
 
             await RoleManager.assignRoleByChannel(member, channel);
 
+            channel.parent = null;
+            await RoleManager.assignRoleByChannel(member, channel);
+            expect(channel.guild.roles.cache.find).not.toHaveBeenCalled();
             expect(member.roles.add).not.toHaveBeenCalled();
         });
 
         it('ゲームチャンネルで既存ロールを付与する', async () => {
             const mockRole = { id: 'role-123', name: 'apex' };
-            const memberRolesCache = new Map();
+            config.get.mockReturnValue('カスタムカテゴリ');
+            RoleManager.initialize();
             const member = {
                 roles: {
                     cache: { has: vi.fn().mockReturnValue(false) },
@@ -99,7 +67,7 @@ describe('RoleManager', () => {
             };
             const channel = {
                 name: 'apex',
-                parent: { name: 'ゲームチャンネル' },
+                parent: { name: 'カスタムカテゴリ' },
                 guild: {
                     roles: {
                         cache: { find: vi.fn().mockReturnValue(mockRole) },

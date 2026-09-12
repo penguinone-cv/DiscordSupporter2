@@ -1,68 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// discord.js をモック - SlashCommandBuilder は class として定義する必要がある
-vi.mock('discord.js', () => {
-    class MockSlashCommandBuilder {
-        setName() { return this; }
-        setDescription() { return this; }
-        addStringOption(fn) {
-            fn({
-                setName() { return this; },
-                setDescription() { return this; },
-                setRequired() { return this; },
-            });
-            return this;
-        }
-        addIntegerOption(fn) {
-            fn({
-                setName() { return this; },
-                setDescription() { return this; },
-                setRequired() { return this; },
-                setMinValue() { return this; },
-                setMaxValue() { return this; },
-            });
-            return this;
-        }
-        addBooleanOption(fn) {
-            fn({
-                setName() { return this; },
-                setDescription() { return this; },
-                setRequired() { return this; },
-            });
-            return this;
-        }
-        toJSON() { return {}; }
-    }
-
-    class MockEmbedBuilder {
-        setColor() { return this; }
-        setTitle() { return this; }
-        setDescription() { return this; }
-        setFooter() { return this; }
-        setTimestamp() { return this; }
-    }
-
-    class MockActionRowBuilder {
-        constructor() { this.components = []; }
-        addComponents() { return this; }
-    }
-
-    class MockButtonBuilder {
-        setCustomId() { return this; }
-        setLabel() { return this; }
-        setStyle() { return this; }
-        setDisabled() { return this; }
-        static from() { return new MockButtonBuilder(); }
-    }
-
-    return {
-        SlashCommandBuilder: MockSlashCommandBuilder,
-        EmbedBuilder: MockEmbedBuilder,
-        ActionRowBuilder: MockActionRowBuilder,
-        ButtonBuilder: MockButtonBuilder,
-        ButtonStyle: { Primary: 1 },
-    };
-});
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // logger をモック
 vi.mock('../../src/utils/logger.js', () => ({
@@ -72,9 +8,15 @@ vi.mock('../../src/utils/logger.js', () => ({
 let voteCommand;
 
 beforeEach(async () => {
+    vi.useFakeTimers();
     vi.resetModules();
     const mod = await import('../../src/commands/vote.js');
     voteCommand = mod.default;
+});
+
+afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
 });
 
 describe('vote command', () => {
@@ -299,7 +241,12 @@ describe('vote command', () => {
 
             await voteCommand.endVote(client, voteData);
 
-            expect(mockMessage.edit).toHaveBeenCalled();
+            expect(mockMessage.edit).toHaveBeenCalledOnce();
+            const result = mockMessage.edit.mock.calls[0][0].embeds[0].toJSON();
+            expect(result.description).toContain('投票者数:** 3名');
+            expect(result.description).toContain('A: **2票**');
+            expect(result.description).toContain('B: **2票**');
+            expect(result.description).toContain('C: **1票**');
             expect(client.votes.has('vote-msg-1')).toBe(false);
         });
     });

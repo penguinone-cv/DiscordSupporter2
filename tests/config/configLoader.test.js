@@ -19,42 +19,12 @@ beforeEach(async () => {
 });
 
 describe('ConfigLoader', () => {
-    describe('get()', () => {
-        it('ドット区切りパスで正しい値を返す', () => {
-            configLoader.config = {
-                discord: { token: 'test-token', clientId: 'test-client-id' },
-                openai: { apiKey: 'test-key' },
-            };
-
-            expect(configLoader.get('discord.token')).toBe('test-token');
-            expect(configLoader.get('discord.clientId')).toBe('test-client-id');
-            expect(configLoader.get('openai.apiKey')).toBe('test-key');
-        });
-
-        it('ネストされたオブジェクトの深い階層にアクセスできる', () => {
-            configLoader.config = {
-                features: {
-                    recruitmentDetection: { enabled: true, csvPath: './data.csv' },
-                },
-            };
-
-            expect(configLoader.get('features.recruitmentDetection.enabled')).toBe(true);
-            expect(configLoader.get('features.recruitmentDetection.csvPath')).toBe('./data.csv');
-        });
-
-        it('存在しないパスで undefined を返す', () => {
-            configLoader.config = { discord: { token: 'test' } };
-
-            expect(configLoader.get('nonexistent')).toBeUndefined();
-            expect(configLoader.get('discord.nonexistent')).toBeUndefined();
-            expect(configLoader.get('a.b.c.d')).toBeUndefined();
-        });
-
-        it('config が null の場合 undefined を返す', () => {
-            configLoader.config = null;
-
-            expect(configLoader.get('discord.token')).toBeUndefined();
-        });
+    it('設定パスの値を取得し、未設定のパスはundefinedを返す', () => {
+        configLoader.config = { features: { mention: { enabled: false } } };
+        expect(configLoader.get('features.mention.enabled')).toBe(false);
+        expect(configLoader.get('features.missing.enabled')).toBeUndefined();
+        configLoader.config = null;
+        expect(configLoader.get('features.mention.enabled')).toBeUndefined();
     });
 
     describe('validate()', () => {

@@ -1,5 +1,7 @@
 # Discord Supporter Bot
 
+現在の仕様の正本は [docs/spec/application.md](docs/spec/application.md)、テスト方針は [docs/spec/testing.md](docs/spec/testing.md) を参照してください。設計判断の履歴（ADR）は [docs/adr/](docs/adr/README.md) に分けて保存します。更新方法は [文書運用](docs/README.md) にまとめています。
+
 ## ゲームチャンネル管理（初回設定）
 
 ゲームチャンネルの活動状況を記録し、管理者がDiscord上のパネルから安全にソフトアーカイブ・再稼働できます。ソフトアーカイブではチャンネルやロールを削除しません。
@@ -79,7 +81,7 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
 
 ### 1. メッセージ分析と自動応答
 - **メンション応答**: Botがメンションされると「はーい」と返事をします
-- **募集メッセージ検出**: OpenAI GPT-4o-miniを使用してメンバー募集メッセージを自動検知
+- **募集メッセージ検出**: 設定されたOpenAIモデルを使用してメンバー募集メッセージを自動検知
   - RAG（Retrieval-Augmented Generation）方式でCSVデータを参考に判断
   - 募集メッセージと判断された場合、チャンネル名と同じロールにメンションして通知
   - 検出理由はCSVログファイルに自動保存（タイムスタンプ、チャンネル、メッセージ、判定結果、理由を記録）
@@ -110,12 +112,12 @@ Node.js製のDiscord Botアプリケーション。メンバー募集メッセ�
 - **返信でリマインド設定**: メッセージに返信で「リマインド」と入力すると、OpenAI APIでメッセージから日付を抽出
 - **自動日時特定**: 「明日」「来週月曜日」「12/25」などの表現を認識して絶対日時に変換
 - **12:00に通知**: 特定された日の12:00（正午）にメンションでリマインド
-- **データ永続化**: `reminders.json` に保存され、Bot再起動後も有効
+- **データ永続化**: `data/reminders.json` に保存され、Bot再起動後も有効
 
 ## セットアップ
 
 ### 必要要件
-- Node.js 24.x
+- Node.js 24.x（`package.json` の engines に準拠）
 - Discord Bot トークン
 - OpenAI API キー
 
@@ -370,8 +372,7 @@ docker-compose up -d --build
 以下のファイルはホストマシンとコンテナ間で共有されます：
 - `config.json` - 設定ファイル（読み取り専用）
 - `recruitment_data.csv` - 学習データ
-- `recruitment_log.csv` - 検出ログ
-- `reminders.json` - リマインダーデータ
+- `data/` - SQLite、リマインダー、カレンダー予定、活動キャッシュと検出ログ（ログの保存先は設定に従う）
 
 ### WebUIへのアクセス
 
