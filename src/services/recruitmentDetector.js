@@ -1,21 +1,21 @@
-import openaiService from './openaiService.js';
+import { classifyRecruitment } from './recruitmentClassifier.js';
 import csvLoader from '../utils/csvLoader.js';
 import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
+import { examplePath } from './recruitmentExamplePath.js';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, resolve } from 'path';
 import { appendFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * 募集メッセージ検出サービス（RAG方式）
+ * 募集メッセージ検出サービス（検証済みの判定例を使用）
  */
 class RecruitmentDetector {
     constructor() {
         this.trainingData = [];
-        this.contextString = '';
     }
 
     /**
@@ -35,17 +35,15 @@ class RecruitmentDetector {
             return;
         }
 
-        // 相対パスを絶対パスに変換
-        const absolutePath = csvPath.startsWith('.')
-            ? join(__dirname, '..', '..', csvPath)
-            : csvPath;
-
-        this.trainingData = csvLoader.load(absolutePath);
-        this.contextString = csvLoader.formatRecruitmentContext(this.trainingData);
-
-        // デバッグ: コンテキスト文字列をログ出力
-        logger.debug(`RAGコンテキスト:\n${this.contextString}`);
-        logger.info(`募集メッセージ検出器を初期化しました (学習データ: ${this.trainingData.length}件)`);
+        try {
+            const records = csvLoader.load(examplePath());
+            this.trainingData = records;
+            logger.info(`判定例を読み込みました (${records.length}件)`);
+            return true;
+        } catch (error) {
+            logger.error('判定例を更新できません。直前の正常な判定例を維持します:', error.message);
+            return false;
+        }
     }
 
     /**
@@ -55,54 +53,19 @@ class RecruitmentDetector {
      * @returns {Promise<Object>} { isRecruitment: boolean, reason: string }
      */
     async detect(message, channel) {
+        const provider = config.get('features.recruitmentDetection.provider') ?? 'openai';
         try {
-            // コンテキストが空の場合は警告
-            if (!this.contextString || this.contextString.trim() === '') {
-                logger.warn('RAGコンテキストが空です。CSVデータが正しく読み込まれていない可能性があります。');
-            }
-
-            const systemPrompt = `あなたは、Discordのメッセージがゲームやイベントの参加者募集を目的としたメッセージかどうかを判定するAIアシスタントです。
-
-${this.contextString}
-
-【重要な判定ルール】
-1. 上記の「募集メッセージの例」に含まれるメッセージと同じ、または類似したメッセージは必ず「募集メッセージ」と判定してください
-2. 上記の「募集メッセージではない例」に含まれるメッセージと同じ、または類似したメッセージは「募集メッセージではない」と判定してください
-3. 例にない新しいメッセージの場合は、以下の判定基準で判断してください:
-   - ゲームやイベントへの参加を呼びかけている
-   - 一緒に何かをする人を探している
-   - 時間や条件を指定して参加者を募っている
-
-JSON形式で以下のように回答してください:
-{
-  "isRecruitment": true/false,
-  "reason": "判定理由を日本語で簡潔に説明"
-}`;
-
-            const messages = [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `以下のメッセージを判定してください:\n\n"${message}"` }
-            ];
-
-            // デバッグ: 送信するプロンプトをログ出力
-            logger.debug(`OpenAIに送信するメッセージ: "${message}"`);
-
-            const result = await openaiService.chatJSON(messages);
-
-            logger.info(`募集判定: "${message}" -> ${result.isRecruitment ? '募集' : '非募集'} (理由: ${result.reason})`);
-
-            // CSVに結果を記録（募集・非募集両方をログ）
-            this.appendToLog(message, result.isRecruitment, result.reason, channel?.name || 'unknown');
-
-            return {
-                isRecruitment: result.isRecruitment,
-                reason: result.reason
-            };
+            const result = await classifyRecruitment(provider, message, this.trainingData);
+            const reason = provider === 'jev' ? '' : result.reason;
+            logger.info(`募集判定 provider=${provider} result=${result.isRecruitment}`);
+            this.appendToLog(message, result.isRecruitment, reason, channel?.name || 'unknown');
+            return { isRecruitment: result.isRecruitment, reason };
         } catch (error) {
-            logger.error('募集メッセージ検出エラー:', error);
+            logger.error(`募集メッセージ検出エラー provider=${provider}:`, error.message);
+            // An API failure is not a negative training label: keep it out of detection CSV.
             return {
                 isRecruitment: false,
-                reason: 'エラーが発生したため判定できませんでした'
+                reason: provider === 'jev' ? '' : 'エラーが発生したため判定できませんでした'
             };
         }
     }
@@ -123,9 +86,7 @@ JSON形式で以下のように回答してください:
             }
 
             // 相対パスを絶対パスに変換
-            const absoluteLogPath = logPath.startsWith('.')
-                ? join(__dirname, '..', '..', logPath)
-                : logPath;
+            const absoluteLogPath = resolve(__dirname, '..', '..', logPath);
 
             // ログディレクトリを作成（存在しない場合）
             const logDir = dirname(absoluteLogPath);
@@ -143,7 +104,7 @@ JSON形式で以下のように回答してください:
 
             // CSVエスケープ処理
             const escapeCsv = (str) => {
-                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
                     return `"${str.replace(/"/g, '""')}"`;
                 }
                 return str;

@@ -1,7 +1,8 @@
 import express from 'express';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { parse } from 'csv-parse/sync';
-import stringify from 'csv-stringify/lib/sync.js';
+import { saveExamples, examplePath } from './recruitmentExampleStore.js';
+import csvLoader, { ExampleValidationError } from '../utils/csvLoader.js';
 import config from '../config/configLoader.js';
 import logger from '../utils/logger.js';
 import reminderService from './reminderService.js';
@@ -85,17 +86,7 @@ class WebServer {
         // CSV取得API
         this.app.get('/api/csv', (req, res) => {
             try {
-                const csvPath = config.get('features.recruitmentDetection.csvPath');
-                const absolutePath = csvPath.startsWith('.')
-                    ? join(__dirname, '..', '..', csvPath)
-                    : csvPath;
-
-                const fileContent = readFileSync(absolutePath, 'utf-8');
-                const records = parse(fileContent, {
-                    columns: true,
-                    skip_empty_lines: true,
-                    trim: true
-                });
+                const records = csvLoader.load(examplePath());
 
                 res.json({
                     success: true,
@@ -122,32 +113,16 @@ class WebServer {
                     });
                 }
 
-                // CSVに変換
-                const csvContent = stringify(data, {
-                    header: true,
-                    columns: ['message', 'is_recruitment', 'reason']
-                });
-
-                const csvPath = config.get('features.recruitmentDetection.csvPath');
-                const absolutePath = csvPath.startsWith('.')
-                    ? join(__dirname, '..', '..', csvPath)
-                    : csvPath;
-
-                writeFileSync(absolutePath, csvContent, 'utf-8');
-                logger.info('CSVファイルを更新しました');
-
-                // RAGデータを再読み込み（Bot再起動なしで反映）
-                const recruitmentDetector = (await import('./recruitmentDetector.js')).default;
-                recruitmentDetector.reload();
-                logger.info('RAGデータを再読み込みしました');
+                saveExamples(data);
+                logger.info('判定例を保存して反映しました');
 
                 res.json({
                     success: true,
-                    message: 'CSVファイルを保存し、RAGデータを更新しました'
+                    message: 'CSVファイルを保存し、判定例を更新しました'
                 });
             } catch (error) {
-                logger.error('CSV保存エラー:', error);
-                res.status(500).json({
+                logger.error('CSV保存エラー:', error.message);
+                res.status(error instanceof ExampleValidationError ? 400 : 500).json({
                     success: false,
                     error: error.message
                 });

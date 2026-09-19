@@ -8,8 +8,8 @@ services:
     volumes:
       # 設定ファイルをマウント（読み取り専用）
       - ./config.json:/app/config.json:ro
-      # CSVデータをマウント
-      - ./recruitment_data.csv:/app/recruitment_data.csv
+      # 旧CSVは初回移行元として読み取り専用。編集するCSVはdata内へ移す。
+      - ./recruitment_data.csv:/app/recruitment_data.csv:ro
       # ログとリマインダーはディレクトリごとマウント（ファイル自動作成を許可）
       - ./data:/app/data
     ports:
@@ -18,6 +18,8 @@ services:
     environment:
       - NODE_ENV=production
       - TZ=Asia/Tokyo
+      - RECRUITMENT_EXAMPLES_DIRECTORY=/app/data
+      - TYPESAFE_API_KEY
     # ヘルスチェック
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

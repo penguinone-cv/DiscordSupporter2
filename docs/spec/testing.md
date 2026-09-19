@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | APP-01 | `config/configLoader` | 必須設定・仮値の拒否、設定取得 |
 | APP-01/03 | `repositories/gameRegistryRepository` | マイグレーション、登録一意性、休眠条件 |
-| APP-02 | `utils/csvLoader`、`services/recruitmentDetector`、`services/openaiService` | CSV分類・読込失敗、判定失敗・ログのCSVエスケープ、外部リクエスト契約 |
+| APP-02 | `utils/csvLoader`、`services/recruitmentDetector`、`services/recruitmentClassifier`、`services/recruitmentExampleStore`、`services/openaiService` | CSV検証・更新失敗時の保存維持、provider切替、Jevの理由空白、判定失敗・ログのCSVエスケープ、外部リクエスト契約 |
 | APP-02 | `handlers/messageHandler`、`handlers/reactionHandler`、`services/roleManager` | 対象外の除外、通知先、機能フラグ、リアクション配送、ロール付与 |
 | APP-02 | `handlers/channelCreateHandler`、`handlers/interactionHandler`、`commands/vote` | イベント／コマンド入口、応答エラー処理、投票制約・集計 |
 | APP-03 | `services/channelActivityService`、`services/archiveCategoryService`、`services/gameArchiveService` | Bot／人間活動、カテゴリ上限、復元・ロールバック |
@@ -49,3 +49,5 @@ Activity変更時は `npm run build:activity` も実行する。このテスト�
 - WebUI: CSV保存後の判定データ反映、ログ・カレンダー表示。ヘルスチェックだけでBot稼働判定しない。
 - ログ: 出力先とエラーが運用上確認できること。プレフィックス・日時表記・DEBUG切替に専用単体テストは置かない。
 - Activity表示: ダッシュボードからの案内、7列・モバイル幅・safe area・下部詳細・viewportを実画面で確認する。CSS/HTMLの特定文字列の存在を表示保証にしない。
+
+募集判定のモデル精度はモックの単体テストと分け、`npm run eval:recruitment` でデータ検証、`-- --live`（dev）と `-- --live --test`（固定test）でAPI比較する。手順と制約は `evals/recruitment/README.md` を参照。
