@@ -17,7 +17,8 @@
             "enabled": true,
             "csvPath": "./recruitment_data.csv",
             "logPath": "./data/recruitment_log.csv",
-            "generalChannelName": "汎用募集チャンネル"
+            "generalChannelName": "汎用募集チャンネル",
+            "provider": "openai"
         },
         "autoRole": {
             "enabled": true,
@@ -36,5 +37,11 @@
         "enabled": false,
         "sessionSecret": "YOUR_RANDOM_SESSION_SECRET_HERE_32",
         "sessionTtlSeconds": 300
+    },
+    "jev": {
+        "apiKey": "",
+        "model": "jev-latest",
+        "timeoutMs": 10000,
+        "threshold": 0.8
     }
 }

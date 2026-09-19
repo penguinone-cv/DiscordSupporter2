@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:activity": "vite build --config vite.activity.config.js",
-    "dev:activity": "vite --config vite.activity.config.js"
+    "dev:activity": "vite --config vite.activity.config.js",
+    "eval:recruitment": "node scripts/evaluate-recruitment.js"
   },
   "keywords": [
     "discord",

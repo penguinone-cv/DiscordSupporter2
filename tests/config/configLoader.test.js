@@ -153,3 +153,39 @@ describe('ConfigLoader', () => {
         });
     });
 });
+
+describe('Jev config', () => {
+    beforeEach(() => {
+        configLoader.config = {
+            discord: { token: 'token', clientId: 'client' }, openai: { apiKey: 'key' },
+            features: { recruitmentDetection: { provider: 'jev' } }, jev: { apiKey: 'key' }
+        };
+    });
+    it('accepts defaults and explicit supported settings', () => {
+        expect(() => configLoader.validate()).not.toThrow();
+        Object.assign(configLoader.config.jev, { model: 'jev-latest', threshold: 0.8, timeoutMs: 3000 });
+        expect(() => configLoader.validate()).not.toThrow();
+    });
+    it.each(['other', '', true, null])('rejects provider %s', provider => {
+        configLoader.config.features.recruitmentDetection.provider = provider;
+        expect(() => configLoader.validate()).toThrow('provider');
+    });
+    it.each([0, -1, 1.1, '0.5', NaN, null])('rejects threshold %s', threshold => {
+        configLoader.config.jev.threshold = threshold;
+        expect(() => configLoader.validate()).toThrow('threshold');
+    });
+    it.each([0, 99, 60001, 1.5, '1000', null])('rejects timeout %s', timeoutMs => {
+        configLoader.config.jev.timeoutMs = timeoutMs;
+        expect(() => configLoader.validate()).toThrow('timeoutMs');
+    });
+    it('requires Jev key but keeps OpenAI dependency for date extraction', () => {
+        vi.stubEnv('TYPESAFE_API_KEY', '');
+        configLoader.config.jev.apiKey = '';
+        expect(() => configLoader.validate()).toThrow('jev.apiKey');
+        vi.stubEnv('TYPESAFE_API_KEY', 'env-key');
+        expect(() => configLoader.validate()).not.toThrow();
+        delete configLoader.config.openai;
+        expect(() => configLoader.validate()).toThrow('openai.apiKey');
+        vi.unstubAllEnvs();
+    });
+});

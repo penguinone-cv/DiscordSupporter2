@@ -1,43 +1,32 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
-import csvLoader from '../../src/utils/csvLoader.js';
-
+import csvLoader, { validateExamples } from '../../src/utils/csvLoader.js';
 vi.mock('fs', () => ({ readFileSync: vi.fn() }));
-vi.mock('../../src/utils/logger.js', () => ({
-    default: { info: vi.fn(), error: vi.fn() }
-}));
-
-describe('CSVLoader', () => {
-    it('実際のCSVを解析し、募集と非募集の参考例を区別する', () => {
-        readFileSync.mockReturnValue([
-            'message,is_recruitment,reason',
-            '"Apex,一緒にやろう",true,参加者募集',
-            '',
-            '今日は休み,false,日常の報告'
-        ].join('\n'));
-
-        const records = csvLoader.load('/examples.csv');
-        expect(records).toEqual([
-            { message: 'Apex,一緒にやろう', is_recruitment: 'true', reason: '参加者募集' },
-            { message: '今日は休み', is_recruitment: 'false', reason: '日常の報告' }
-        ]);
-        const [positive, negative] = csvLoader.formatRecruitmentContext(records)
-            .split('【募集メッセージではない例】');
-        expect(positive).toContain('Apex,一緒にやろう');
-        expect(positive).toContain('参加者募集');
-        expect(positive).not.toContain('今日は休み');
-        expect(negative).toContain('今日は休み');
-        expect(negative).toContain('日常の報告');
-        expect(negative).not.toContain('Apex,一緒にやろう');
+const row = (message = '一緒に遊ぼう', label = 'true') => ({ message, is_recruitment: label, reason: '' });
+describe('CSV examples', () => {
+    it('parses BOM, quotes and optional blank reason', () => {
+        readFileSync.mockReturnValue('\uFEFFmessage,is_recruitment,reason\n"Apex,一緒にやろう",true,\n');
+        expect(csvLoader.load('/data.csv')).toEqual([row('Apex,一緒にやろう')]);
     });
-
-    it('ファイルを読めない場合は参考例なしで継続する', () => {
+    it.each([null, [row(' ')], [row('x', 'TRUE')], [{ ...row(), reason: 1 }], [row('x'.repeat(2001))], Array.from({ length: 33 }, (_, i) => row(String(i))), Array.from({ length: 9 }, (_, i) => row(String(i) + 'x'.repeat(1999)))])('rejects invalid or oversized dataset', data => {
+        expect(() => validateExamples(data)).toThrow();
+    });
+    it('rejects normalized duplicates and contradictory labels', () => {
+        expect(() => validateExamples([row('ＡＢＣ'), row('abc')])).toThrow('重複');
+        expect(() => validateExamples([row('hello'), row('hello', 'false')])).toThrow('矛盾');
+    });
+    it.each(['', 'wrong,header\n', 'message,message,is_recruitment\n'])('rejects invalid headers without clearing examples', csv => {
+        readFileSync.mockReturnValue(csv);
+        expect(() => csvLoader.load('/bad')).toThrow('ヘッダー');
+    });
+    it('allows a valid header-only CSV to explicitly clear examples', () => {
+        readFileSync.mockReturnValue('message,is_recruitment,reason\n');
+        expect(csvLoader.load('/empty')).toEqual([]);
+    });
+    it('propagates read and parse failures so caller can preserve previous data', () => {
         readFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
-        expect(csvLoader.load('/missing.csv')).toEqual([]);
-    });
-
-    it('壊れたCSVの場合は参考例なしで継続する', () => {
-        readFileSync.mockReturnValue('message,is_recruitment,reason\n"unclosed,true,reason');
-        expect(csvLoader.load('/invalid.csv')).toEqual([]);
+        expect(() => csvLoader.load('/missing')).toThrow('ENOENT');
+        readFileSync.mockReturnValue('message,is_recruitment,reason\n"unclosed,true,x');
+        expect(() => csvLoader.load('/bad')).toThrow();
     });
 });

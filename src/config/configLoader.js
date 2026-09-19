@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getRecruitmentProvider, getJevSettings } from './recruitmentConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,10 +56,12 @@ class ConfigLoader {
         value = value?.[k];
       }
 
-      if (!value || value.includes('YOUR_')) {
+      if (typeof value !== 'string' || !value.trim() || value.includes('YOUR_')) {
         throw new Error(`必須項目 "${key}" が設定されていません`);
       }
     }
+
+    if (getRecruitmentProvider(this) === 'jev') getJevSettings(this);
 
     if (this.get('activity.enabled') === true) {
       if (this.get('webui.enabled') !== true) {
