@@ -1,3 +1,5 @@
+> 過去の資料です。現在の仕様は[正本](../spec/application.md)を参照してください。
+
 # 候補日 Activity 作業手順
 
 1. 最新mainを取得し codex/activity-candidate-calendar を作成する。

@@ -1,3 +1,5 @@
+> 過去の資料です。現在の仕様は[正本](../spec/application.md)を参照してください。
+
 # Discord Activity 月間予定カレンダー タスク分解
 
 各実装タスクは `RED → GREEN → REFACTOR` の順で進める。テストを追加せずに実装だけを先行させない。
