@@ -11,6 +11,7 @@ import { ActivityAuthService } from './activityAuthService.js';
 import { ActivitySessionService } from './activitySessionService.js';
 import activityScheduleService from './activityScheduleService.js';
 import activityCandidateService from './activityCandidateService.js';
+import activityCalendarService from './activityCalendarService.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -48,7 +49,8 @@ class WebServer {
         // Mount before the legacy JSON parser so the Activity size limit and error boundary apply.
         this.app.use('/api/activity/schedule', createActivityScheduleRouter({
             enabled: activityEnabled, clientId: config.get('discord.clientId'),
-            authService, sessionService, scheduleService: activityScheduleService, candidateService: activityCandidateService
+            authService, sessionService, scheduleService: activityScheduleService,
+            candidateService: activityCandidateService, calendarService: activityCalendarService
         }));
         this.app.use('/schedule', (_req, res, next) => {
             res.set({

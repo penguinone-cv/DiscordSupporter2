@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createActivityScheduleRouter } from '../../src/routes/activityScheduleRouter.js';
 
 describe('Activity schedule API', () => {
-    let app, authService, sessionService, scheduleService, candidateService;
+    let app, authService, sessionService, scheduleService, candidateService, calendarService;
     const identity = { userId: 'self', guildId: 'guild', instanceId: 'instance' };
     const guild = { id: 'guild' };
     beforeEach(() => {
@@ -25,13 +25,28 @@ describe('Activity schedule API', () => {
             getCandidates: vi.fn().mockResolvedValue({ candidates: [] }),
             createRecruitment: vi.fn().mockResolvedValue({ recruitmentId: 7 })
         };
+        calendarService = { getCalendar: vi.fn().mockReturnValue({ events: [], relatedEvents: [], channels: [] }) };
         app = express();
         app.use('/api/activity/schedule', createActivityScheduleRouter({
-            enabled: true, clientId: 'public-app-id', authService, sessionService, scheduleService, candidateService
+            enabled: true, clientId: 'public-app-id', authService, sessionService, scheduleService, candidateService, calendarService
         }));
     });
     const base = '/api/activity/schedule';
     const authorized = req => req.set('Authorization', 'Bearer session');
+
+    it('確定予定にも認証・本人の現所属を適用し、年月とチャンネルだけを受け付ける', async () => {
+        expect((await request(app).get(`${base}/calendar`)).status).toBe(401);
+        expect(calendarService.getCalendar).not.toHaveBeenCalled();
+        const result = await authorized(request(app).get(`${base}/calendar?year=2025&month=12&channelId=channel`));
+        expect(result.status).toBe(200);
+        expect(result.headers['cache-control']).toBe('no-store');
+        expect(calendarService.getCalendar).toHaveBeenCalledWith(guild, { id: 'self' }, { year: 2025, month: 12, channelId: 'channel' });
+        calendarService.getCalendar.mockClear();
+        for (const query of ['guildId=other', 'userId=other', 'year=abc&month=1', 'year=2026&month=1&month=2', 'channelId[]=secret', 'channelId=']) {
+            expect((await authorized(request(app).get(`${base}/calendar?${query}`))).status).toBe(400);
+        }
+        expect(calendarService.getCalendar).not.toHaveBeenCalled();
+    });
 
     it('候補と募集APIにも所属認証を適用し本人を固定する', async () => {
         expect((await request(app).get(`${base}/candidate-games`)).status).toBe(401);
