@@ -1,6 +1,6 @@
 # アプリケーション仕様（正本）
 
-2026-09-12、`16a2713` の実装を基準とする。今回の整理では機能動作・DBスキーマを変更しない。関連判断: [ADR-0005](../adr/0005-main-activity-baseline.md)。
+2026-09-12、`16a2713` の実装を基準とし、以降の変更を反映する。関連判断: [ADR-0005](../adr/0005-main-activity-baseline.md)、[ADR-0007](../adr/0007-confirmed-calendar-activity.md)。
 
 ## APP-01 構成と保存先
 
@@ -77,6 +77,9 @@
 
 ## APP-07 Activity認証・共有カレンダー
 
+- 共通入口に「予定入力」「候補日確認」「確定済み予定」の3タブを持つ。確定済み予定はリマインドで保存した `calendarEvents` を読み、通知後も履歴を表示する。予定編集と候補からの募集投稿を同じActivityで行える。
+- 確定済み予定は前月・翌月・今月へ移動でき、過去月も閲覧する。サーバーの予定タイムゾーンで日付を判定し、リマインド用の12:00をゲームの開始時刻として表示しない。月セルを選ぶと予定内容を日付詳細に表示する。
+- 確定済み予定のAPIは `/api/activity/schedule/calendar`。認証元サーバーの、本人にチャンネル閲覧・履歴閲覧権限がある現在のチャンネルだけを対象にする。私有スレッドは参加済みまたはスレッド管理権限を要する。他サーバー・削除済みチャンネル・権限のない予定は返さない。チャンネルIDで絞り込み、選択したチャンネルのロールメンバーに関連する他チャンネルの予定と名前も表示する。ゲームでは保存済みロールID、ゲーム未登録では同名ロールを使う。
 - `activity.enabled` と `webui.enabled`、Discord clientSecret、32文字以上のsessionSecretを設定して有効化する。Activityは `/schedule/`、APIは `/api/activity/schedule`。Viteでビルドする。
 - Discord SDKのidentify認可コードをサーバーで交換し、OAuth本人、Activity instanceのアプリ・ギルド・参加者、現在の非Bot所属を照合する。URLや本文のguild/userを信用しない。
 - HMAC署名の短期セッションを使用する（既定5分）。全認証済みAPIで署名・期限・現在の所属を検証する。トークンはクライアントのメモリで保持する。通常ブラウザ・ギルド情報のない起動では予定を取得しない。
@@ -88,4 +91,4 @@
 - 候補詳細からの募集はAPP-05の既存サービスへ接続する。Activity内では参加表明・開催確定を行わず、Discord募集メッセージで操作する。
 - Botのコマンド登録ではPortalの既存Entry Pointを保持する。取得失敗時は一括上書きを実行せず、存在しないEntry Pointを推測作成しない。
 
-根拠: `src/routes/activityScheduleRouter.js`、`src/services/activityAuthService.js`、`activitySessionService.js`、`activityScheduleService.js`、`activityCandidateService.js`、`guildMemberService.js`、`src/bot.js`、`activity/src/`。
+根拠: `src/routes/activityScheduleRouter.js`、`src/services/activityAuthService.js`、`activitySessionService.js`、`activityScheduleService.js`、`activityCandidateService.js`、`activityCalendarService.js`、`guildMemberService.js`、`src/bot.js`、`activity/src/`。

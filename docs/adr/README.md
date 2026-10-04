@@ -10,6 +10,7 @@ ADR本文の保存場所。現在の仕様は [../spec/](../README.md) を参照
 | [0004](0004-risk-based-tests.md) | リスクに応じて必要なテストを残す | Accepted | 2026-09-12 |
 | [0005](0005-main-activity-baseline.md) | 最新mainのActivity仕様へ基準を更新する | Accepted | 2026-09-12 |
 | [0006](0006-recruitment-providers-and-examples.md) | 募集判定providerと検証済み判定例を分離する | Accepted | 2026-09-19 |
+| [0007](0007-confirmed-calendar-activity.md) | 確定済み予定カレンダーを共通Activityへ統合する | Accepted | 2026-10-01 |
 
 「現状の記録」は過去の採用日や理由を推測したものではない。初回整理時に確認した実装を今後の変更の基準として扱う。課題のある現状を記録しても、改善不能という意味にはしない。
 

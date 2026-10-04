@@ -11,7 +11,7 @@ async function start() {
     app?.destroy();
     await connection?.disconnect?.().catch(() => {});
     if (window.self === window.top) {
-        showNotice(root, 'Discordから起動してください。サーバーのメンバーパネルにある「予定・候補日を開く」から開けます。');
+        showNotice(root, 'Discordから起動してください。サーバーのメンバーパネルにある「予定・募集・確定予定を開く」から開けます。');
         return;
     }
     showNotice(root, 'Discordに接続しています…');

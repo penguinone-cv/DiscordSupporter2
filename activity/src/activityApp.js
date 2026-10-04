@@ -1,14 +1,16 @@
 import { createScheduleApp } from './scheduleApp.js';
 import { createCandidateApp } from './candidateApp.js';
+import { createConfirmedApp } from './confirmedApp.js';
 import { element } from './view.js';
 
-export function createActivityApp(root, { api, scheduleFactory = createScheduleApp, candidateFactory = createCandidateApp } = {}) {
+export function createActivityApp(root, { api, scheduleFactory = createScheduleApp, candidateFactory = createCandidateApp, confirmedFactory = createConfirmedApp } = {}) {
     let app, current = 'schedule', mode = -1, locked = false, destroyed = false, switching = false;
     const content = element('div');
-    const buttons = ['schedule', 'candidates'].map((tab, index) => element('button', {
+    const factories = { schedule: scheduleFactory, candidates: candidateFactory, confirmed: confirmedFactory };
+    const buttons = ['schedule', 'candidates', 'confirmed'].map((tab, index) => element('button', {
         type: 'button', 'data-tab': tab, 'aria-pressed': String(index === 0),
         onClick: () => { if (!locked && !switching && tab !== current) void mount(tab); }
-    }, index === 0 ? '予定入力' : '候補日確認'));
+    }, ['予定入力', '候補日確認', '確定済み予定'][index]));
     const navigation = element('nav', { className: 'activity-tabs', 'aria-label': '予定の機能' }, buttons);
     function sync() {
         navigation.hidden = mode !== 0;
@@ -20,7 +22,7 @@ export function createActivityApp(root, { api, scheduleFactory = createScheduleA
     async function mount(tab) {
         if (destroyed) return;
         switching = true; app?.destroy(); current = tab; locked = false; sync();
-        app = (tab === 'schedule' ? scheduleFactory : candidateFactory)(content, { api, onBusy: busy => { locked = busy; sync(); } });
+        app = factories[tab](content, { api, onBusy: busy => { locked = busy; sync(); } });
         app.setLayoutMode(mode);
         try { await app.start(); }
         finally { switching = false; sync(); }

@@ -32,7 +32,7 @@ function rateLimit(limit, keyOf) {
     };
 }
 
-export function createActivityScheduleRouter({ enabled, clientId, authService, sessionService, scheduleService, candidateService }) {
+export function createActivityScheduleRouter({ enabled, clientId, authService, sessionService, scheduleService, candidateService, calendarService }) {
     const router = express.Router();
     const route = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res, next)).catch(next);
     router.use((_req, res, next) => {
@@ -56,12 +56,22 @@ export function createActivityScheduleRouter({ enabled, clientId, authService, s
     }));
     router.use(rateLimit(240, req => `${req.activityIdentity.guildId}:${req.activityIdentity.userId}`));
     router.use(route(async (req, _res, next) => {
-        const { guild } = await authService.assertCurrentMember(req.activityIdentity);
+        const { guild, member } = await authService.assertCurrentMember(req.activityIdentity);
         req.activityGuild = guild;
+        req.activityMember = member;
         // Continue only after both the signature and current membership have been checked.
         next();
     }));
     const owner = req => ({ guildId: req.activityIdentity.guildId, userId: req.activityIdentity.userId });
+    router.get('/calendar', route(async (req, res) => {
+        if (Object.keys(req.query).some(key => !['year', 'month', 'channelId'].includes(key))) throw invalidRequest();
+        if (Object.values(req.query).some(value => typeof value !== 'string')) throw invalidRequest();
+        const { year, month, channelId } = req.query;
+        if (channelId !== undefined && (typeof channelId !== 'string' || !/^[A-Za-z0-9_-]{1,512}$/.test(channelId))) throw invalidRequest();
+        const input = { ...(year !== undefined ? { year: positiveId(year) } : {}),
+            ...(month !== undefined ? { month: positiveId(month) } : {}), ...(channelId !== undefined ? { channelId } : {}) };
+        res.json(await calendarService.getCalendar(req.activityGuild, req.activityMember, input));
+    }));
     router.get('/candidate-games', route(async (req, res) => {
         if (Object.keys(req.query).length) throw invalidRequest();
         res.json(await candidateService.listGames(req.activityGuild));

@@ -72,7 +72,7 @@ describe('gameMemberPanelService', () => {
         expect(payloadText).toContain('候補日程');
         expect(payloadText).not.toContain('候補日時');
         expect(scheduleButtons[0]).toEqual(expect.objectContaining({
-            label: '予定・候補日を開く', style: ButtonStyle.Primary
+            label: '予定・募集・確定予定を開く', style: ButtonStyle.Primary
         }));
         expect(scheduleButtons[1]).toEqual(expect.objectContaining({
             label: '月間予定（週表示）', style: ButtonStyle.Secondary

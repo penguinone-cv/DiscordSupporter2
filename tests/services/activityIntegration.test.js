@@ -1,4 +1,4 @@
-import { Collection } from 'discord.js';
+import { Collection, PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import config from '../../src/config/configLoader.js';
@@ -9,6 +9,7 @@ import gameInterestRepository from '../../src/repositories/gameInterestRepositor
 import { ActivitySessionService } from '../../src/services/activitySessionService.js';
 import scheduleService from '../../src/services/scheduleService.js';
 import webServer from '../../src/services/webServer.js';
+import reminderService from '../../src/services/reminderService.js';
 
 const BASE = '/api/activity/schedule';
 const GUILD_ID = 'integration-guild';
@@ -22,10 +23,13 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
     let guild;
     let sessionService;
     let externalFetch;
+    let originalEvents;
 
     beforeEach(() => {
         originalConfig = config.config;
         originalApp = webServer.app;
+        originalEvents = reminderService.calendarEvents;
+        reminderService.calendarEvents = new Map();
         vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(new Date('2026-09-05T00:00:00Z'));
         externalFetch = vi.fn().mockRejectedValue(new Error('External HTTP is forbidden in integration tests'));
@@ -44,7 +48,8 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
         ]);
         guild = {
             id: GUILD_ID, memberCount: cache.size,
-            members: { cache, fetch: vi.fn(async ({ user } = {}) => user ? cache.get(user) : cache) }
+            members: { cache, fetch: vi.fn(async ({ user } = {}) => user ? cache.get(user) : cache) },
+            channels: { cache: new Collection() }, roles: { cache: new Collection() }
         };
         const discordClient = {
             guilds: { fetch: vi.fn(async id => id === GUILD_ID ? guild : null) }
@@ -58,6 +63,7 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
         database.close();
         config.config = originalConfig;
         webServer.app = originalApp;
+        reminderService.calendarEvents = originalEvents;
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
         vi.useRealTimers();
@@ -75,6 +81,29 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
         expect(result.headers['cache-control']).toBe('no-store');
         return result.body;
     }
+
+    it('確定予定APIは実署名と現所属・チャンネル権限でJSON保存済み予定を分離する', async () => {
+        let canRead = true;
+        guild.channels.cache.set('readable', {
+            id: 'readable', name: 'ゲーム', guildId: GUILD_ID, isTextBased: () => true,
+            permissionsFor: () => new PermissionsBitField(canRead ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] : [])
+        });
+        for (const [id, guildId, channelId] of [['notified', GUILD_ID, 'readable'], ['foreign', 'other', 'readable'], ['deleted', GUILD_ID, 'missing']]) {
+            reminderService.calendarEvents.set(id, { id, guildId, channelId, remindAt: '2026-08-31T15:00:00Z', originalContent: '開催確定' });
+        }
+        expect((await request(webServer.app).get(`${BASE}/calendar`)).status).toBe(401);
+        const response = await authorized(request(webServer.app).get(`${BASE}/calendar`));
+        expect(response.status).toBe(200);
+        expect(response.body.events).toEqual([expect.objectContaining({ id: 'notified', localDate: '2026-09-01', content: '開催確定' })]);
+        expect(response.body.month).toMatchObject({ year: 2026, month: 9, timezone: 'Asia/Tokyo' });
+        expect(response.headers['cache-control']).toBe('no-store');
+        canRead = false;
+        expect((await authorized(request(webServer.app).get(`${BASE}/calendar`))).body.events).toEqual([]);
+        expect((await authorized(request(webServer.app).get(`${BASE}/calendar?channelId=readable`))).status).toBe(404);
+        expect((await authorized(request(webServer.app).get(`${BASE}/calendar?year=2026&month=13`))).status).toBe(400);
+        guild.members.cache.delete('self');
+        expect((await authorized(request(webServer.app).get(`${BASE}/calendar`))).status).toBe(403);
+    });
 
     it('候補APIは実DBのゲーム希望者の人数と名前を返し他guildのゲームを拒否する', async () => {
         const game = gameRepository.registerChannel({ guildId: GUILD_ID, channelId: 'game-channel', channelName: 'game', parentCategoryId: 'category' });
