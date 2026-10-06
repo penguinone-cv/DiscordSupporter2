@@ -347,6 +347,27 @@ class AvailabilityRepository {
         }).immediate();
     }
 
+    setDateRangeStatuses({ guildId, userId, monthId, startDate, endDate, revision, changes }) {
+        return database.transaction(() => {
+            const current = this.getDateRangeResetPreview({ guildId, userId, monthId, startDate, endDate });
+            if (revision !== current.revision) {
+                throw Object.assign(new Error('対象範囲または基本予定が更新されました。最新の内容を再確認してください'), {
+                    status: 409, code: 'RANGE_CONFLICT'
+                });
+            }
+            const slotIds = new Set(current.slots.map(slot => slot.id));
+            if (changes.some(change => !slotIds.has(change.slotId))) {
+                throw Object.assign(new Error('選択範囲内の予定枠を指定してください'), {
+                    status: 400, code: 'SLOT_OUT_OF_RANGE'
+                });
+            }
+            for (const { slotId, status } of changes) {
+                this.setUserSlotStatus({ guildId, userId, slotId, status, source: 'manual' });
+            }
+            return changes.length;
+        }).immediate();
+    }
+
     listCandidateResponses(guildId, monthId, gameId) {
         if (!database.isInitialized) return [];
         return database.connection().prepare(`

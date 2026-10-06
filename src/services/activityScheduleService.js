@@ -146,10 +146,44 @@ class ActivityScheduleService {
 
     resetRange(args, now = new Date()) {
         this.validateRange(args, now);
-        if (typeof args.revision !== 'string' || !/^[a-f0-9]{64}$/.test(args.revision)) {
+        this.validateRevision(args.revision);
+        return { slotCount: availabilityRepository.resetDateRangeToBasic(args) };
+    }
+
+    validateRevision(revision) {
+        if (typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision)) {
             fail(400, 'INVALID_REVISION', '対象範囲を確認してから実行してください');
         }
-        return { slotCount: availabilityRepository.resetDateRangeToBasic(args) };
+    }
+
+    previewChanges(args, now = new Date()) {
+        this.validateRange(args, now);
+        const { slots, revision } = availabilityRepository.getDateRangeResetPreview(args);
+        return {
+            monthId: args.monthId, startDate: args.startDate, endDate: args.endDate,
+            slotCount: slots.length, revision,
+            slots: slots.map(slot => ({ ...slotSummary(slot), status: slot.status ?? slot.basic_status ?? 'unset' }))
+        };
+    }
+
+    changeRange(args, now = new Date()) {
+        this.validateRange(args, now);
+        this.validateRevision(args.revision);
+        if (!Array.isArray(args.changes) || args.changes.length < 1 || args.changes.length > 62) {
+            fail(400, 'INVALID_CHANGES', '変更する予定枠を指定してください');
+        }
+        const ids = new Set();
+        for (const change of args.changes) {
+            if (!change || typeof change !== 'object' || Array.isArray(change)
+                || Object.keys(change).some(key => !['slotId', 'status'].includes(key))) {
+                fail(400, 'INVALID_CHANGES', '変更内容が不正です');
+            }
+            positiveId(change.slotId);
+            if (!EDITABLE_STATUSES.has(change.status)) fail(400, 'INVALID_STATUS', '予定の状態が不正です');
+            if (ids.has(change.slotId)) fail(400, 'DUPLICATE_SLOT', '同じ予定枠を複数回指定できません');
+            ids.add(change.slotId);
+        }
+        return { slotCount: availabilityRepository.setDateRangeStatuses(args) };
     }
 }
 

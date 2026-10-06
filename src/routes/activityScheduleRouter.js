@@ -102,7 +102,9 @@ export function createActivityScheduleRouter({ enabled, clientId, authService, s
     }));
     for (const [path, method, fields] of [
         ['/range-reset/preview', 'previewReset', ['monthId', 'startDate', 'endDate']],
-        ['/range-reset', 'resetRange', ['monthId', 'startDate', 'endDate', 'revision']]
+        ['/range-reset', 'resetRange', ['monthId', 'startDate', 'endDate', 'revision']],
+        ['/range-edit/preview', 'previewChanges', ['monthId', 'startDate', 'endDate']],
+        ['/range-edit', 'changeRange', ['monthId', 'startDate', 'endDate', 'revision', 'changes']]
     ]) {
         router.post(path, route(async (req, res) => {
             const input = bodyFields(req.body, fields);

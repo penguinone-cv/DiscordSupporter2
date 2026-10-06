@@ -32,11 +32,11 @@
 | APP-06 | `services/reminderService` | 日付抽出の失敗、保存・復元、予定保持 |
 | APP-07 | `services/activityAuthService`、`services/activitySessionService`、`services/guildMemberService` | OAuth/instance/現所属、署名・期限・秘密値保護、メンバーキャッシュの補完 |
 | APP-07 | `routes/activityScheduleRouter`、`services/activityWebServer`、`services/activityIntegration` | HTTP認証、本人固定、本文制限・レート制限、実署名と実SQLiteの結合 |
-| APP-04/07 | `services/activityScheduleService`、`repositories/availabilityRepository` | 共有集計、未登録、直接指定、範囲revision・原子性・所属境界 |
+| APP-04/07 | `services/activityScheduleService`、`repositories/availabilityRepository` | 共有集計、未登録、直接指定、範囲編集・復元のrevision・原子性・所属境界 |
 | APP-05/07 | `services/activityCandidateService`、`activity/candidateApp` | 候補名・回答・募集状態、対象月、既存募集接続、二重送信防止 |
 | APP-06/07 | `services/activityCalendarService`、`activity/confirmedApp`、`services/activityIntegration` | 確定予定の保存元、サーバー・チャンネル権限、関連メンバー、月／日付境界、過去月表示、古い応答と更新停止 |
 | APP-07 | `activity/activityApp`、`activity/activityClient`、`activity/api` | 共通タブ、SDK認証、非表示化、再認証・再試行制限 |
-| APP-07 | `activity/calendarModel`、`activity/scheduleApp` | カレンダー日付境界、本人編集、復元確認、古い応答・縮小表示制御 |
+| APP-07 | `activity/calendarModel`、`activity/scheduleApp` | カレンダー日付境界、本人編集、復元確認、連続・一括変更の確定時保存／破棄、古い応答・縮小表示制御 |
 | APP-07 | `botCommandRegistration` | PortalのEntry Point保持、取得失敗時の上書き防止 |
 
 ## 実行と限界
