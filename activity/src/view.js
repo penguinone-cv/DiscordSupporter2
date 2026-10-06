@@ -37,7 +37,11 @@ export function renderSchedule(root, state, actions) {
                 button('今月', () => actions.changeMonth(0), { 'aria-pressed': String(state.offset === 0), 'data-key': 'month-0', disabled: state.busy }),
                 element('h2', { id: 'month-title' }, `${month.year}年 ${month.month}月`),
                 button('翌月', () => actions.changeMonth(1), { 'aria-pressed': String(state.offset === 1), 'data-key': 'month-1', disabled: state.busy })),
-            element('div', { className: 'toolbar-actions' }, button(state.rangeStart !== null ? '範囲選択をやめる' : '範囲を基本予定へ戻す', actions.beginRange, { 'data-action': 'range', 'data-key': 'range', disabled: state.busy || Boolean(state.error) }), button('更新', actions.refresh, { 'data-key': 'refresh', disabled: state.busy }))),
+            element('div', { className: 'toolbar-actions' },
+                [['continuous', '連続予定変更'], ['bulk', '一括予定変更'], ['reset', '範囲を基本予定へ戻す']].map(([mode, label]) => button(state.rangeMode === mode ? '範囲選択をやめる' : label, () => actions.beginRange(mode), {
+                    'data-action': mode === 'reset' ? 'range' : `range-${mode}`, 'data-key': `range-${mode}`,
+                    'aria-pressed': String(state.rangeMode === mode), disabled: state.busy || Boolean(state.error)
+                })), button('更新', actions.refresh, { 'data-key': 'refresh', disabled: state.busy }))),
         element('p', { className: 'legend' }, '○ 参加可能　△ 未定　× 参加不可　未 未入力・未登録'),
         state.rangeStart !== null ? element('p', { className: 'range-hint' }, state.rangeStart ? `${state.rangeStart} を選択中。終了日を押してください。` : '開始日と終了日を順に押してください。同じ日を2回押すと1日だけ選べます。') : null
     );
@@ -57,14 +61,44 @@ export function renderSchedule(root, state, actions) {
         })));
     }
     main.append(grid);
-    const feedback = element('div', { className: `feedback${state.error ? ' error' : ''}`, role: 'status', 'aria-live': 'polite' }, state.busy ? '保存・読み込み中…' : state.error || state.message || '変更は自動で保存されます');
+    const editing = state.preview && state.rangeMode !== 'reset';
+    const changeCount = state.rangeMode === 'bulk' ? state.bulkStatus ? state.preview?.slotCount ?? 0 : 0 : Object.keys(state.draft).length;
+    const feedback = element('div', { className: `feedback${state.error ? ' error' : ''}`, role: 'status', 'aria-live': 'polite' }, state.busy ? '保存・読み込み中…' : state.error || (editing ? `${changeCount}枠の変更が未保存です。「確定」を押すと保存します。` : state.message || '変更は自動で保存されます'));
     root.replaceChildren(main);
     if (!modal) root.append(feedback);
     if (modal) {
         const sheet = element('section', { className: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title', tabindex: '-1' });
-        sheet.append(element('div', { className: 'sheet-heading' }, element('h2', { id: 'sheet-title' }, state.preview ? '基本予定に戻しますか？' : state.day.localDate), button('閉じる', actions.close, { 'data-key': 'close', 'aria-label': '詳細を閉じる', disabled: state.busy })));
+        const title = state.discard ? '未保存の変更を破棄しますか？' : editing ? state.rangeMode === 'bulk' ? '一括予定変更' : '連続予定変更' : state.preview ? '基本予定に戻しますか？' : state.day.localDate;
+        sheet.append(element('div', { className: 'sheet-heading' }, element('h2', { id: 'sheet-title' }, title), button('閉じる', actions.close, { 'data-key': 'close', 'aria-label': '詳細を閉じる', disabled: state.busy })));
         sheet.append(feedback);
-        if (state.preview) {
+        if (state.discard) {
+            sheet.append(element('p', {}, '編集中の変更は保存されません。'),
+                button('編集を続ける', actions.continueEditing, { className: 'primary', 'data-key': 'continue-editing' }),
+                button('変更を破棄', actions.discard, { 'data-action': 'discard', 'data-key': 'discard' }));
+        } else if (editing) {
+            sheet.append(element('p', {}, `${state.preview.startDate} 〜 ${state.preview.endDate} · 昼・夜を含む${state.preview.slotCount}枠`));
+            if (state.rangeMode === 'bulk') {
+                sheet.append(element('p', {}, '範囲内のすべての枠に設定する予定を選んでください。'),
+                    element('div', { className: 'status-options', role: 'group', 'aria-label': '範囲全体の予定' }, STATUSES.map(status => button(statusLabel(status), () => actions.setBulkStatus(status), {
+                        'data-status': status, 'data-key': `bulk-${status}`, 'aria-pressed': String(state.bulkStatus === status), disabled: state.busy
+                    }))),
+                    element('ul', { className: 'reset-slots' }, state.preview.slots.map(slot => element('li', {}, `${slot.localDate} ${slotLabel(slot)}: ${statusLabel(slot.status)}${state.bulkStatus ? ` → ${statusLabel(state.bulkStatus)}` : ''}`))));
+            } else {
+                sheet.append(element('p', {}, '自分の予定を枠ごとに変更してください。確定するまでは保存されません。'));
+                for (const slot of state.preview.slots) {
+                    const status = state.draft[slot.id] ?? slot.status;
+                    sheet.append(element('section', { className: 'range-slot', 'data-slot': slot.id },
+                        element('h3', {}, `${slot.localDate} ${slotLabel(slot)}`),
+                        element('p', { className: status }, statusLabel(status), Object.hasOwn(state.draft, slot.id) ? '（未保存）' : ''),
+                        element('div', { className: 'status-options', role: 'group', 'aria-label': `${slot.localDate} ${slotLabel(slot)}の自分の予定` }, STATUSES.map(option => button(statusLabel(option), () => actions.stage(slot.id, option), {
+                            'data-status': option, 'data-key': `range-status-${slot.id}-${option}`, 'aria-pressed': String(status === option), disabled: state.busy
+                        })))));
+                }
+            }
+            sheet.append(element('div', { className: 'range-footer' },
+                button(`確定（${changeCount}枠）`, actions.confirmChanges, { className: 'primary', 'data-action': 'confirm-changes', 'data-key': 'confirm-changes', disabled: state.busy || !changeCount }),
+                button('キャンセル', actions.close, { 'data-key': 'cancel-changes', disabled: state.busy })));
+        } else if (state.preview) {
             sheet.append(element('p', {}, `${state.preview.startDate} 〜 ${state.preview.endDate}`), element('p', {}, `昼・夜を含む${state.preview.slotCount}枠を、現在の基本予定に戻します。基本予定のない枠は未入力になります。この操作は取り消せません。`),
                 element('ul', { className: 'reset-slots' }, state.preview.slots.map(slot => element('li', {}, `${slot.localDate} ${slotLabel(slot)}`))),
                 button('基本予定に戻す', actions.confirmReset, { className: 'primary', 'data-action': 'confirm-reset', 'data-key': 'confirm-reset', disabled: state.busy || Boolean(state.error) }));

@@ -194,6 +194,9 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
         expect((await authorized(request(webServer.app).post(`${BASE}/range-reset/preview`)).send(range)).status).toBe(400);
         expect((await authorized(request(webServer.app).post(`${BASE}/range-reset`))
             .send({ ...range, revision: 'a'.repeat(64) })).status).toBe(400);
+        expect((await authorized(request(webServer.app).post(`${BASE}/range-edit/preview`)).send(range)).status).toBe(400);
+        expect((await authorized(request(webServer.app).post(`${BASE}/range-edit`)).send({ ...range,
+            revision: 'a'.repeat(64), changes: [{ slotId: slot.id, status: 'unavailable' }] })).status).toBe(400);
         expect((await readDay(month.month.id)).slots[0].members.map(member => member.status))
             .toEqual(['unregistered', 'unregistered']);
     });
@@ -223,6 +226,54 @@ describe('Activity HTTP / authentication / SQLite integration', () => {
             .send({ ...range, revision: preview.body.revision });
         expect(stale.status).toBe(409);
         expect(stale.body.error.code).toBe('RESET_CONFLICT');
+        expect((await readDay(month.month.id)).slots[0].members[0].status).toBe('unavailable');
+    });
+
+    it('実HTTPで月全体の一括保存と枠別の連続保存を行い、他人の予定を維持する', async () => {
+        const month = await readMonth();
+        const monday = month.slots.find(slot => slot.localDate === MONDAY);
+        const tuesday = month.slots.find(slot => slot.localDate === TUESDAY);
+        await putStatus(month.month.id, monday.id, 'maybe', 'other');
+        const range = { monthId: month.month.id, startDate: '2026-09-01', endDate: '2026-09-30' };
+        const preview = await authorized(request(webServer.app).post(`${BASE}/range-edit/preview`)).send(range);
+        expect(preview.status).toBe(200);
+        expect(preview.body.slotCount).toBe(month.slots.length);
+        expect((await readMonth()).slots.every(slot => slot.selfStatus === 'unregistered')).toBe(true);
+        const bulk = { ...range, revision: preview.body.revision,
+            changes: preview.body.slots.map(slot => ({ slotId: slot.id, status: 'unavailable' })) };
+        expect(Buffer.byteLength(JSON.stringify(bulk))).toBeLessThan(8192);
+        const result = await authorized(request(webServer.app).post(`${BASE}/range-edit`)).send(bulk);
+        expect(result.status).toBe(200);
+        expect(result.body.slotCount).toBe(month.slots.length);
+        expect((await readMonth()).slots.every(slot => slot.selfStatus === 'unavailable')).toBe(true);
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'other', monday.id).status).toBe('maybe');
+        const current = await authorized(request(webServer.app).post(`${BASE}/range-edit/preview`)).send(range);
+        const changes = [{ slotId: monday.id, status: 'available' }, { slotId: tuesday.id, status: 'unset' }];
+        expect((await authorized(request(webServer.app).post(`${BASE}/range-edit`))
+            .send({ ...range, revision: current.body.revision, changes })).status).toBe(200);
+        const updated = await readMonth();
+        expect(updated.slots.find(slot => slot.id === monday.id).selfStatus).toBe('available');
+        expect(updated.slots.find(slot => slot.id === tuesday.id).selfStatus).toBe('unset');
+        expect(updated.slots.filter(slot => !changes.some(change => change.slotId === slot.id))
+            .every(slot => slot.selfStatus === 'unavailable')).toBe(true);
+    });
+
+    it('範囲編集APIは範囲外・本人の上書き・古いrevisionを無変更で拒否する', async () => {
+        const month = await readMonth();
+        const monday = month.slots.find(slot => slot.localDate === MONDAY);
+        const tuesday = month.slots.find(slot => slot.localDate === TUESDAY);
+        const range = { monthId: month.month.id, startDate: MONDAY, endDate: MONDAY };
+        const preview = await authorized(request(webServer.app).post(`${BASE}/range-edit/preview`)).send(range);
+        const input = { ...range, revision: preview.body.revision, changes: [{ slotId: monday.id, status: 'available' }] };
+        for (const changes of [[...input.changes, { slotId: tuesday.id, status: 'maybe' }],
+            [{ ...input.changes[0], userId: 'other' }], [{ ...input.changes[0], status: 'invalid' }]]) {
+            expect((await authorized(request(webServer.app).post(`${BASE}/range-edit`)).send({ ...input, changes })).status).toBe(400);
+        }
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', monday.id).source).toBeNull();
+        await putStatus(month.month.id, monday.id, 'unavailable');
+        const stale = await authorized(request(webServer.app).post(`${BASE}/range-edit`)).send(input);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error.code).toBe('RANGE_CONFLICT');
         expect((await readDay(month.month.id)).slots[0].members[0].status).toBe('unavailable');
     });
 

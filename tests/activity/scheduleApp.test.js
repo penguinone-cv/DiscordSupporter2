@@ -8,16 +8,94 @@ describe('month calendar UI', () => {
     const day = { localDate: '2026-09-05', slots: [{ id: 2, label: '昼', startMinutes: 840, members: [{ userId: 'self', displayName: 'あなた', status: 'unset', isSelf: true }, { userId: 'other', displayName: '<img src=x onerror=alert(1)>', status: 'unregistered', isSelf: false }] }] };
     beforeEach(() => {
         root = document.createElement('div'); document.body.append(root);
-        api = { request: vi.fn(async path => {
+        api = { request: vi.fn(async (path, options) => {
             if (path.startsWith('/month?')) return structuredClone(month);
             if (path.includes('/days/')) return structuredClone(day);
             if (path === '/range-reset/preview') return { monthId: 1, startDate: '2026-09-05', endDate: '2026-09-06', slotCount: 2, revision: 'revision', slots: [{ id: 2, localDate: '2026-09-05', label: '昼', startMinutes: 840 }] };
+            if (path === '/range-edit/preview') return { ...options.body, slotCount: 2, revision: 'revision', slots: [
+                { id: 2, localDate: '2026-09-05', label: '昼', status: 'unset' },
+                { id: 3, localDate: '2026-09-06', label: '夜', status: 'available' }
+            ] };
             return { status: 'maybe', slotCount: 2 };
         }) };
         app = createScheduleApp(root, { api });
         app.setLayoutMode(0);
     });
     afterEach(() => { app.destroy(); root.remove(); vi.useRealTimers(); });
+    async function openRange(mode) {
+        await app.start();
+        root.querySelector(`[data-action=range-${mode}]`).click();
+        await app.selectDate('2026-09-06');
+        await app.selectDate('2026-09-05');
+    }
+    const writes = () => api.request.mock.calls.filter(([path, options]) => options?.method === 'PUT' || path === '/range-edit');
+
+    it('連続変更は枠ごとに保持し、確定時だけ1回まとめて保存する', async () => {
+        vi.useFakeTimers();
+        await openRange('continuous');
+        expect(root.querySelector('[data-action=confirm-changes]').disabled).toBe(true);
+        root.querySelector('[data-slot="2"] [data-status=maybe]').click();
+        root.querySelector('[data-slot="3"] [data-status=unavailable]').click();
+        expect(root.querySelector('[data-slot="2"] [data-status=maybe]').getAttribute('aria-pressed')).toBe('true');
+        expect(writes()).toEqual([]);
+        const requests = api.request.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(15000);
+        await app.refresh();
+        window.dispatchEvent(new Event('focus'));
+        app.setLayoutMode(1); app.setLayoutMode(0);
+        expect(api.request.mock.calls).toHaveLength(requests);
+        expect(root.querySelector('[data-slot="3"] [data-status=unavailable]').getAttribute('aria-pressed')).toBe('true');
+        root.querySelector('[data-action=confirm-changes]').click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(writes()).toEqual([['/range-edit', { method: 'POST', body: {
+            monthId: 1, startDate: '2026-09-05', endDate: '2026-09-06', revision: 'revision',
+            changes: [{ slotId: 2, status: 'maybe' }, { slotId: 3, status: 'unavailable' }]
+        } }]]);
+        expect(root.querySelector('[role=dialog]')).toBeNull();
+    });
+
+    it('連続変更を元の値に戻せば保存対象から外し、破棄確認で誤操作を防ぐ', async () => {
+        await openRange('continuous');
+        root.querySelector('[data-slot="2"] [data-status=maybe]').click();
+        root.querySelector('[data-slot="2"] [data-status=unset]').click();
+        expect(root.querySelector('[data-action=confirm-changes]').disabled).toBe(true);
+        root.querySelector('[data-slot="3"] [data-status=unavailable]').click();
+        root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(root.textContent).toContain('未保存の変更を破棄');
+        root.querySelector('[data-key=continue-editing]').click();
+        expect(root.querySelector('[data-slot="3"] [data-status=unavailable]').getAttribute('aria-pressed')).toBe('true');
+        root.querySelector('[data-key=cancel-changes]').click();
+        root.querySelector('[data-action=discard]').click();
+        expect(root.querySelector('[role=dialog]')).toBeNull();
+        expect(document.activeElement.dataset.date).toBe('2026-09-06');
+        expect(writes()).toEqual([]);
+    });
+
+    it('一括変更は選んだ状態を昼夜すべてに適用し、確定まで保存しない', async () => {
+        await openRange('bulk');
+        root.querySelector('[data-status=unavailable]').click();
+        expect(writes()).toEqual([]);
+        expect(root.querySelectorAll('.reset-slots li')).toHaveLength(2);
+        root.querySelector('[data-action=confirm-changes]').click();
+        await vi.waitFor(() => expect(root.querySelector('[role=dialog]')).toBeNull());
+        expect(writes()).toEqual([['/range-edit', { method: 'POST', body: {
+            monthId: 1, startDate: '2026-09-05', endDate: '2026-09-06', revision: 'revision',
+            changes: [{ slotId: 2, status: 'unavailable' }, { slotId: 3, status: 'unavailable' }]
+        } }]]);
+    });
+
+    it('範囲保存の通信失敗は入力を保持し、競合は再確認を要求する', async () => {
+        await openRange('continuous');
+        root.querySelector('[data-slot="2"] [data-status=maybe]').click();
+        api.request.mockRejectedValueOnce(new Error('通信に失敗しました'));
+        root.querySelector('[data-action=confirm-changes]').click();
+        await vi.waitFor(() => expect(root.textContent).toContain('通信に失敗'));
+        expect(root.querySelector('[data-slot="2"] [data-status=maybe]').getAttribute('aria-pressed')).toBe('true');
+        api.request.mockRejectedValueOnce(Object.assign(new Error('競合'), { status: 409 }));
+        root.querySelector('[data-action=confirm-changes]').click();
+        await vi.waitFor(() => expect(root.textContent).toContain('再確認'));
+        expect(root.querySelector('[data-action=confirm-changes]')).toBeNull();
+    });
     it('日曜始まり、全4集計、本人だけ編集、名前のHTMLを実行しない', async () => {
         await app.start();
         expect([...root.querySelectorAll('[role=columnheader]')].map(el => el.textContent)).toEqual(['日','月','火','水','木','金','土']);

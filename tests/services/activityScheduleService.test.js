@@ -228,6 +228,75 @@ describe('activityScheduleService', () => {
         expect(activityScheduleService.resetRange({ ...args, revision: preview.revision }, NOW)).toEqual({ slotCount: 4 });
     });
 
+    it('範囲編集のプレビューは保存せず、指定した枠だけ本人の手動予定として保存する', () => {
+        setMondayBasic('self', 'available');
+        const month = createMonth();
+        setAnswer(month, 'a', 'maybe');
+        const range = { guildId: GUILD_ID, userId: 'self', monthId: month.id, startDate: '2026-09-07', endDate: '2026-09-09' };
+        const before = availabilityRepository.listMonthResponses(GUILD_ID, month.id);
+        const preview = activityScheduleService.previewChanges(range, NOW);
+        expect(preview.slots.map(slot => slot.status)).toEqual(['available', 'unset', 'unset']);
+        expect(availabilityRepository.listMonthResponses(GUILD_ID, month.id)).toEqual(before);
+        expect(activityScheduleService.changeRange({ ...range, revision: preview.revision, changes: [
+            { slotId: preview.slots[0].id, status: 'unavailable' }, { slotId: preview.slots[1].id, status: 'unset' }
+        ] }, NOW)).toEqual({ slotCount: 2 });
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', preview.slots[0].id)).toMatchObject({ status: 'unavailable', source: 'manual' });
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', preview.slots[1].id)).toMatchObject({ status: 'unset', source: 'manual' });
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', preview.slots[2].id).source).toBeNull();
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'a', preview.slots[0].id).status).toBe('maybe');
+    });
+
+    it('単日も昼夜を含め一括変更でき、範囲外は維持する', () => {
+        const month = createMonth();
+        const range = { guildId: GUILD_ID, userId: 'self', monthId: month.id, startDate: '2026-09-05', endDate: '2026-09-05' };
+        const preview = activityScheduleService.previewChanges(range, NOW);
+        expect(preview.slotCount).toBe(2);
+        activityScheduleService.changeRange({ ...range, revision: preview.revision,
+            changes: preview.slots.map(slot => ({ slotId: slot.id, status: 'unavailable' })) }, NOW);
+        expect(availabilityRepository.listUserMonthSlots(GUILD_ID, 'self', month.id)
+            .filter(slot => slot.source !== null).map(slot => [slot.local_date, slot.status])).toEqual([
+            ['2026-09-05', 'unavailable'], ['2026-09-05', 'unavailable']
+        ]);
+    });
+
+    it('範囲編集は不正・重複・範囲外の変更を全体無変更で拒否する', () => {
+        const month = createMonth();
+        const range = { guildId: GUILD_ID, userId: 'self', monthId: month.id, startDate: '2026-09-07', endDate: '2026-09-08' };
+        const preview = activityScheduleService.previewChanges(range, NOW);
+        const valid = { slotId: preview.slots[0].id, status: 'available' };
+        const outside = slotOn(month, '2026-09-09');
+        const next = createMonth(2026, 10);
+        const foreign = createMonth(2026, 9, 'foreign');
+        const foreignSlot = availabilityRepository.listMonthSlots('foreign', foreign.id)[0];
+        for (const changes of [null, [], [null], [valid, valid], [valid, { ...valid, slotId: -1 }],
+            [{ ...valid, status: 'unregistered' }], [{ ...valid, userId: 'a' }], [{ ...valid, slotId: String(valid.slotId) }],
+            [valid, { slotId: outside.id, status: 'maybe' }], [valid, { slotId: slotOn(next, '2026-10-01').id, status: 'maybe' }],
+            [valid, { slotId: foreignSlot.id, status: 'maybe' }], Array(63).fill(valid)]) {
+            expect(() => activityScheduleService.changeRange({ ...range, revision: preview.revision, changes }, NOW))
+                .toThrow(expect.objectContaining({ status: 400 }));
+            expect(activityScheduleService.previewChanges(range, NOW).revision).toBe(preview.revision);
+        }
+        expect(() => activityScheduleService.changeRange({ ...range, changes: [valid] }, NOW))
+            .toThrow(expect.objectContaining({ status: 400, code: 'INVALID_REVISION' }));
+    });
+
+    it('範囲編集は本人の回答・基本予定の競合や他人のrevisionを拒否する', () => {
+        const month = createMonth();
+        const range = { guildId: GUILD_ID, userId: 'self', monthId: month.id, startDate: '2026-09-07', endDate: '2026-09-08' };
+        const preview = activityScheduleService.previewChanges(range, NOW);
+        const input = { ...range, revision: preview.revision, changes: preview.slots.map(slot => ({ slotId: slot.id, status: 'unavailable' })) };
+        expect(() => activityScheduleService.changeRange({ ...input, userId: 'a' }, NOW))
+            .toThrow(expect.objectContaining({ status: 409 }));
+        setMondayBasic('self', 'available');
+        expect(() => activityScheduleService.changeRange(input, NOW)).toThrow(expect.objectContaining({ status: 409 }));
+        const current = activityScheduleService.previewChanges(range, NOW);
+        setAnswer(month, 'self', 'maybe');
+        expect(() => activityScheduleService.changeRange({ ...input, revision: current.revision }, NOW))
+            .toThrow(expect.objectContaining({ status: 409 }));
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', preview.slots[0].id).status).toBe('maybe');
+        expect(availabilityRepository.findUserSlot(GUILD_ID, 'self', preview.slots[1].id).source).toBeNull();
+    });
+
     it.each([
         ['2026-09-08', '2026-09-07'], ['2026-09-01', '2026-10-01'],
         ['2026-08-31', '2026-09-01'], ['2026-09-01', '2026-09-31']

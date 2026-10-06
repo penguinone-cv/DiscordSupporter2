@@ -108,6 +108,21 @@ describe('availabilityRepository Activity queries', () => {
             .map(slot => [slot.status, slot.source])).toEqual([['available', 'manual'], ['maybe', 'manual']]);
     });
 
+    it('範囲編集中のDB失敗は保存済み回答と新規回答をまとめてロールバックする', () => {
+        answer('available');
+        const preview = availabilityRepository.getDateRangeResetPreview(range);
+        const lastSlotId = preview.slots[1].id;
+        database.connection().exec(`CREATE TRIGGER reject_edit BEFORE INSERT ON user_availability
+            WHEN NEW.slot_id = ${lastSlotId}
+            BEGIN SELECT RAISE(ABORT, 'test edit failure'); END`);
+        expect(() => availabilityRepository.setDateRangeStatuses({ ...range, revision: preview.revision,
+            changes: preview.slots.map(slot => ({ slotId: slot.id, status: 'unavailable' })) })).toThrow('test edit failure');
+        expect(availabilityRepository.getDateRangeResetPreview(range).revision).toBe(preview.revision);
+        expect(availabilityRepository.listUserMonthSlots('guild-1', 'self', month.id)
+            .filter(slot => slot.local_date >= range.startDate && slot.local_date <= range.endDate)
+            .map(slot => [slot.status, slot.source])).toEqual([['available', 'manual'], ['unset', null]]);
+    });
+
     it('従来のrevisionなし週復元でも基本なしを明示unsetとして保存する', () => {
         answer('available');
         expect(availabilityRepository.resetDateRangeToBasic(range)).toBe(2);

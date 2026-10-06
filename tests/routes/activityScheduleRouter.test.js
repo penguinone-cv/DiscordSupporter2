@@ -18,7 +18,9 @@ describe('Activity schedule API', () => {
             getDay: vi.fn().mockResolvedValue({ localDate: '2026-09-05', slots: [] }),
             setStatus: vi.fn().mockReturnValue({ slotId: 2, status: 'maybe' }),
             previewReset: vi.fn().mockReturnValue({ revision: 'revision', slotCount: 2 }),
-            resetRange: vi.fn().mockReturnValue({ slotCount: 2 })
+            resetRange: vi.fn().mockReturnValue({ slotCount: 2 }),
+            previewChanges: vi.fn().mockReturnValue({ revision: 'revision', slotCount: 2, slots: [] }),
+            changeRange: vi.fn().mockReturnValue({ slotCount: 2 })
         };
         candidateService = {
             listGames: vi.fn().mockReturnValue({ games: [] }),
@@ -103,6 +105,22 @@ describe('Activity schedule API', () => {
         const result = await authorized(request(app).post(`${base}/range-reset`)).send({ ...range, revision: 'old' });
         expect(result.status).toBe(409);
         expect(result.body.error.code).toBe('range_conflict');
+    });
+    it('範囲編集も認証本人に固定し、本文からの本人・guildの変更を拒否する', async () => {
+        const range = { monthId: 1, startDate: '2026-09-05', endDate: '2026-09-06' };
+        const input = { ...range, revision: 'revision', changes: [{ slotId: 2, status: 'unavailable' }] };
+        expect((await request(app).post(`${base}/range-edit/preview`).send(range)).status).toBe(401);
+        expect((await request(app).post(`${base}/range-edit`).send(input)).status).toBe(401);
+        expect(scheduleService.changeRange).not.toHaveBeenCalled();
+        expect((await authorized(request(app).post(`${base}/range-edit/preview`)).send(range)).status).toBe(200);
+        expect(scheduleService.previewChanges).toHaveBeenCalledWith({ guildId: 'guild', userId: 'self', ...range });
+        expect((await authorized(request(app).post(`${base}/range-edit`)).send(input)).status).toBe(200);
+        expect(scheduleService.changeRange).toHaveBeenCalledWith({ guildId: 'guild', userId: 'self', ...input });
+        scheduleService.changeRange.mockClear();
+        for (const extra of [{ userId: 'other' }, { guildId: 'other' }]) {
+            expect((await authorized(request(app).post(`${base}/range-edit`)).send({ ...input, ...extra })).status).toBe(400);
+        }
+        expect(scheduleService.changeRange).not.toHaveBeenCalled();
     });
     it('退会後のアクセスを拒否し、想定外エラーに内部情報を含めない', async () => {
         authService.assertCurrentMember.mockRejectedValueOnce(Object.assign(new Error('退会済み'), { status: 403, code: 'not_current_member' }));
