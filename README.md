@@ -343,6 +343,8 @@ DiscordSupporter_AI/
 - Docker Desktop (Windows) または Docker Engine (Ubuntu)
 - Docker Compose
 
+DockerイメージのNode.jsは、ビルド用・実行用ともに24.22.1 LTS（`node:24.22.1-bookworm-slim`）へ固定しています。更新を反映する場合は `docker-compose build --pull` の後に `docker-compose up -d` を実行します。
+
 ### セットアップ
 
 1. **設定ファイルを準備**

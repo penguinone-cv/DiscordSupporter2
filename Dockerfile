@@ -1,5 +1,5 @@
-# Node.js 24 LTS: better-sqlite3のネイティブビルドに備えた依存関係ステージ
-FROM node:24-bookworm-slim AS dependencies
+# Node.js 24.22.1 LTS: better-sqlite3のネイティブビルドに備えた依存関係ステージ
+FROM node:24.22.1-bookworm-slim AS dependencies
 
 WORKDIR /app
 RUN apt-get update \
@@ -13,7 +13,7 @@ COPY vite.activity.config.js ./
 RUN npm run build:activity && npm prune --omit=dev
 
 # 実行用イメージにはビルドツールを含めない
-FROM node:24-bookworm-slim
+FROM node:24.22.1-bookworm-slim
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
